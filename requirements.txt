@@ -3,10 +3,5 @@ opencv-python>=4.8.0
 mediapipe>=0.10.9
 numpy>=1.24.0
 
-# Thư viện âm thanh và Giọng nói cảnh báo
-pyttsx3>=2.90
-pygame>=2.5.0
-
-# Thư viện tiện ích
-keyboard>=0.13.5
+# Thư viện kiểm thử
 pytest>=7.4.0

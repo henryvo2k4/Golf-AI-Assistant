@@ -1,6 +1,6 @@
 """
-CẤU HÌNH THÔNG SỐ TOÀN DỰ ÁN TRỢ LÝ AI GOLF
-Dành cho: Học sinh Nguyễn Tuấn Khải & Chuyên gia Võ Tá Dũng
+CẤU HÌNH THÔNG SỐ TOÀN DỰ ÁN TRỢ LÝ AI GOLF (VAR GOLF)
+Hiển thị trực quan toàn bộ kết quả lên màn hình (Visual HUD & On-screen Alerts)
 """
 
 # ==============================
@@ -25,10 +25,6 @@ GOLFER_HANDEDNESS = "right"
 # Dưới 150 độ là bị lỗi co tay / gập cùi chỏ (Bent Lead Arm / Chicken Wing)
 LEAD_ARM_MIN_ANGLE = 150.0
 
-# Ngưỡng độ cao cổ tay để nhận diện pha đưa gậy lên (Backswing)
-# Trong tọa độ hình ảnh: y=0 ở mép trên cùng, y=1 ở mép dưới cùng
-WRIST_HEIGHT_PEAK_TOLERANCE = 0.03
-
 # ==============================
 # CẤU HÌNH BÀN ĐẠP CHÂN (FOOT PEDAL)
 # ==============================
@@ -40,23 +36,15 @@ QUIT_KEY_CODE = ord('q')              # Phím Q để thoát
 # ==============================
 # CẤU HÌNH BỘ NHỚ ĐỆM (BUFFER)
 # ==============================
-# Ghi đệm tối đa 5 giây cú swing (ở 60FPS ~ 300 frames)
 BUFFER_SECONDS = 5
 MAX_BUFFER_FRAMES = TARGET_FPS * BUFFER_SECONDS
 
 # ==============================
-# CẤU HÌNH ÂM THANH & GIỌNG NÓI (TTS)
-# ==============================
-ENABLE_VOICE_ALERT = True
-TTS_SPEECH_RATE = 160                 # Tốc độ đọc (từ/phút)
-TTS_ALERT_MESSAGE = "Cảnh báo: Bạn bị gập tay trái ở đỉnh swing, hãy giữ thẳng tay!"
-TTS_SUCCESS_MESSAGE = "Tư thế tốt, tay trái thẳng đạt chuẩn!"
-
-# ==============================
 # MÀU SẮC GIAO DIỆN (ĐỊNH DẠNG BGR)
 # ==============================
-COLOR_GREEN = (0, 230, 64)            # Màu xanh lá đạt chuẩn
+COLOR_GREEN = (0, 230, 64)            # Màu xanh lá đạt chuẩn PGA
 COLOR_RED = (0, 0, 255)               # Màu đỏ cảnh báo lỗi
-COLOR_YELLOW = (0, 215, 255)          # Màu vàng trạng thái chờ
-COLOR_WHITE = (255, 255, 255)         # Màu trắng văn bản
-COLOR_DARK_BG = (30, 30, 30)          # Màu nền bảng điều khiển
+COLOR_YELLOW = (0, 215, 255)          # Màu vàng trạng thái chuẩn bị / chờ
+COLOR_CYAN = (255, 255, 0)            # Màu xanh dương nhạt
+COLOR_WHITE = (255, 255, 255)         # Màu trắng chữ
+COLOR_DARK_BG = (20, 20, 20)          # Màu nền bảng điều khiển HUD
