@@ -1,11 +1,10 @@
 """
 CẤU HÌNH THÔNG SỐ TOÀN DỰ ÁN TRỢ LÝ AI GOLF (VAR GOLF)
-Giao diện Desktop trực quan + Phân tích toàn diện 5 lỗi sinh trắc học Golf
+Tích hợp chuẩn sinh trắc học PGA / TPI (3D World Landmarks + Face-On / Down-the-Line)
 """
 
 import os
 
-# Đường dẫn gốc dự án
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_PATH = os.path.join(BASE_DIR, "assets", "models", "pose_landmarker_full.task")
 RECORDINGS_DIR = os.path.join(BASE_DIR, "assets", "videos")
@@ -19,35 +18,44 @@ CAPTURE_WIDTH = 1280
 CAPTURE_HEIGHT = 720
 TARGET_FPS = 30
 
-# Thời gian đếm ngược & ghi hình theo yêu cầu thực chiến
-COUNTDOWN_SECONDS = 5       # Đếm ngược 5 giây để golfer bước lên thảm vào vị trí
-RECORD_SECONDS = 10         # Ghi hình tối đa 10 giây cho mỗi lượt đánh
+COUNTDOWN_SECONDS = 5
+RECORD_SECONDS = 10
 MIRROR_CAMERA_DEFAULT = True
 
 # ==============================
-# CẤU HÌNH PHÂN TÍCH SINH TRẮC HỌC GOLF (CHUẨN PGA)
+# NGƯỠNG SINH TRẮC HỌC CHUẨN PGA / TPI (3D + 2D)
 # ==============================
-GOLFER_HANDEDNESS = "right"          # Mặc định thuận tay phải
+GOLFER_HANDEDNESS = "right"
 
-# 1. Góc khuỷu tay dẫn hướng (Tay trái cho người thuận tay phải)
-LEAD_ARM_MIN_ANGLE = 150.0           # Chuẩn PGA >= 150° tại Đỉnh Swing & Chạm bóng
+# 1. Góc duỗi khuỷu tay dẫn hướng (3D Elbow Angle tại Đỉnh Swing -> Chạm bóng)
+# Sử dụng pose_world_landmarks (3D mét) để không bị sai lệch do góc nghiêng camera
+LEAD_ARM_MIN_ANGLE_3D = 150.0        # Chuẩn PGA >= 150° (Tối ưu 165° - 180°)
 
-# 2. Nhấp nhô / Ngẩng đầu sớm (Head Lift / Dip)
-HEAD_DRIFT_MAX_RATIO = 0.07          # Dịch chuyển dọc đầu tối đa <= 7% chiều cao cơ thể
+# 2. Độ ổn định trục đầu (Head Stability: Setup -> Impact)
+HEAD_VERTICAL_DRIFT_MAX_RATIO = 0.07 # Dịch chuyển lên/xuống tối đa <= 7% chiều cao cơ thể
+HEAD_LATERAL_DRIFT_MAX_RATIO = 0.08  # Dịch chuyển ngang đầu tối đa <= 8% chiều cao cơ thể
 
-# 3. Trượt / Lắc hông ngang (Pelvic Sway)
-HIP_SWAY_MAX_RATIO = 0.14            # Trượt hông ngang qua trục chân sau tối đa <= 14% độ rộng thế đứng
+# 3. Trượt / Lắc hông ngang (Pelvic Sway - Góc quay Chính diện Face-On)
+HIP_SWAY_MAX_RATIO = 0.14            # Hông sau không trượt quá trục chân sau > 14% bề rộng thế đứng
 
-# 4. Ngược trục cột sống (Reverse Spine Angle)
-REVERSE_SPINE_MAX_DEG = 4.0          # Độ nghiêng cột sống ngược về phía mục tiêu tối đa <= 4° tại đỉnh swing
+# 4. Ngược trục cột sống (Reverse Spine Angle - Góc quay Chính diện Face-On)
+REVERSE_SPINE_MAX_DEG = 4.0          # Thân trên ở đỉnh swing không đổ ngược về mục tiêu > 4°
 
-# 5. Độ ổn định đầu gối chân trụ (Knee Stability)
-KNEE_MIN_ANGLE = 128.0               # Không chùng sụp gối dưới 128°
-KNEE_MAX_ANGLE = 178.0               # Không duỗi thẳng cứng sớm (Early Extension) ở đỉnh swing/impact
+# 5. Xoay vai ở Đỉnh Swing (3D Shoulder Turn - Mặt phẳng ngang X-Z)
+SHOULDER_TURN_MIN_DEG = 65.0         # Chuẩn golfer xoay vai đạt 70° - 105° so với lúc Setup
+
+# 6. Ổn định đầu gối chân trụ (3D Knee Flexion Angle)
+KNEE_MIN_ANGLE_3D = 128.0            # Không chùng sụp gối dưới 128°
+KNEE_MAX_ANGLE_3D = 176.0            # Không duỗi thẳng cứng sớm (Early Extension) trước/tại Impact
+
+# 7. Giữ góc gập lưng Setup (Spine Flexion - Dành cho góc quay Nhìn ngang Down-the-Line)
+DTL_SPINE_FLEXION_MIN_DEG = 20.0     # Cúi người tối thiểu >= 20° (tránh đứng thẳng đơ)
+DTL_POSTURE_LOSS_MAX_DEG = 12.0      # Không nhổm lưng mất góc quá 12° khi chạm bóng (Early Extension)
 
 # ==============================
-# CẤU HÌNH FONT CHỮ TIẾNG VIỆT (WINDOWS)
+# FONT CHỮ TIẾNG VIỆT (WINDOWS)
 # ==============================
 FONT_BOLD_PATH = r"C:\Windows\Fonts\segoeuib.ttf"
 FONT_REGULAR_PATH = r"C:\Windows\Fonts\segoeui.ttf"
+FONT_MONO_PATH = r"C:\Windows\Fonts\consolab.ttf"
 FALLBACK_FONT_PATH = r"C:\Windows\Fonts\arial.ttf"

@@ -14,7 +14,10 @@ if PARENT_DIR not in sys.path:
 from src.utils.geometry import (
     calculate_angle_2d,
     calculate_angle_3d,
+    calculate_shoulder_turn_xz_deg,
     calculate_spine_away_tilt_deg,
+    calculate_spine_forward_flexion_deg,
+    smooth_landmarks_sequence,
 )
 
 
@@ -55,3 +58,32 @@ def test_spine_away_tilt_negative_when_reverse_spine():
     # Mục tiêu bên phải (+1.0). Vai đổ sang phải (+15px) -> Ngược trục về phía mục tiêu -> Âm (-)
     tilt = calculate_spine_away_tilt_deg((100, 300), (115, 200), target_dir_sign=1.0)
     assert tilt < -5.0
+
+
+def test_shoulder_turn_xz_90_degrees():
+    # Setup: trục vai dọc theo X; Top: trục vai xoay 90 độ dọc theo Z
+    turn = calculate_shoulder_turn_xz_deg(
+        addr_left_sh=(0.2, 0.0, 0.0),
+        addr_right_sh=(-0.2, 0.0, 0.0),
+        top_left_sh=(0.0, 0.0, 0.2),
+        top_right_sh=(0.0, 0.0, -0.2),
+    )
+    assert math.isclose(turn, 90.0, abs_tol=1e-3)
+
+
+def test_spine_forward_flexion_45_deg():
+    flex = calculate_spine_forward_flexion_deg((100, 300), (200, 200))
+    assert math.isclose(flex, 45.0, abs_tol=1e-3)
+
+
+def test_smooth_landmarks_sequence_reduces_spike():
+    seq = [
+        {"nose": (100.0, 100.0, 0.0, 0.99)},
+        {"nose": (100.0, 100.0, 0.0, 0.99)},
+        {"nose": (150.0, 100.0, 0.0, 0.99)},  # Nhiễu tăng vọt 50px ở frame giữa
+        {"nose": (100.0, 100.0, 0.0, 0.99)},
+        {"nose": (100.0, 100.0, 0.0, 0.99)},
+    ]
+    smoothed = smooth_landmarks_sequence(seq)
+    # 0.4 * 150 + 0.6 * 100 = 120.0
+    assert math.isclose(smoothed[2]["nose"][0], 120.0, abs_tol=1e-3)
