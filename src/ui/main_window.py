@@ -1,7 +1,9 @@
 """
-MAIN DESKTOP UI - VAR GOLF STUDIO (BORDERLESS FULLSCREEN WHITE BENTO UI)
-Clean white aesthetic, generous rounded cards, soft drop shadows, vector SVG icons,
-full English interface, and 2D + 3D PGA/TPI biomechanics diagnostics.
+MAIN DESKTOP UI - VAR GOLF STUDIO (ULTRA-MINIMAL BORDERLESS KIOSK UI)
+Designed for 1-screen mouse-free / touch-free golf bays:
+- Borderless fullscreen (no window chrome or mouse-only clutter)
+- Controlled by 1 physical button / foot pedal ([SPACE])
+- Horizontal auto-sliding diagnostic carousel (4.0s hold per slide + smooth slide transition)
 """
 
 import copy
@@ -10,7 +12,18 @@ import time
 import cv2
 import numpy as np
 
-from PySide6.QtCore import QRectF, QSize, QThread, QTimer, Qt, Signal
+from PySide6.QtCore import (
+    QEasingCurve,
+    QParallelAnimationGroup,
+    QPoint,
+    QPropertyAnimation,
+    QRectF,
+    QSize,
+    QThread,
+    QTimer,
+    Qt,
+    Signal,
+)
 from PySide6.QtGui import (
     QColor,
     QFont,
@@ -23,18 +36,13 @@ from PySide6.QtGui import (
     QShortcut,
 )
 from PySide6.QtWidgets import (
-    QCheckBox,
-    QComboBox,
     QFrame,
     QHBoxLayout,
     QLabel,
     QMainWindow,
-    QMessageBox,
     QProgressBar,
     QPushButton,
-    QScrollArea,
     QSizePolicy,
-    QSlider,
     QStackedWidget,
     QVBoxLayout,
     QWidget,
@@ -44,7 +52,7 @@ import config
 from src.core.swing_analyzer import BatchSwingAnalyzer, FaultCriterion, SwingAnalysisResult
 from src.ui.icons import svg_icon, svg_pixmap
 from src.ui.theme import COLORS, FONT_MONO, apply_soft_shadow, build_app_stylesheet
-from src.utils.drawing import draw_skeleton_overlay, render_annotated_snapshot
+from src.utils.drawing import render_annotated_snapshot
 
 
 # ==============================
@@ -67,7 +75,7 @@ class CameraWorker(QThread):
         if not cap.isOpened():
             self.camera_error.emit(
                 f"Unable to connect to Webcam (ID={self.camera_index}). "
-                "Please check the USB cable or Camera permissions in Windows Settings."
+                "Check the USB cable or Camera permissions in Windows Settings."
             )
             return
 
@@ -196,149 +204,310 @@ def mirror_criterion(criterion: FaultCriterion, width: int) -> FaultCriterion:
 
 
 # ==============================
-# DIAGNOSTIC CARD WIDGET
+# SINGLE DIAGNOSTIC SLIDE (IMAGE + TEXT)
 # ==============================
-class FaultCardWidget(QFrame):
-    clicked = Signal(object)
+class SwingSlideWidget(QFrame):
+    """Single full-stage slide pairing an annotated joint snapshot with large readable coaching text."""
 
-    def __init__(self, criterion: FaultCriterion, is_selected: bool = False):
-        super().__init__()
+    def __init__(
+        self,
+        annotated_bgr: np.ndarray,
+        criterion: FaultCriterion,
+        slide_index: int,
+        total_slides: int,
+        parent=None,
+    ):
+        super().__init__(parent)
+        self.setObjectName("SlideCard")
+        self._source_pixmap = bgr_to_pixmap(annotated_bgr)
         self.criterion = criterion
-        self.setCursor(Qt.PointingHandCursor)
-        self._build_ui(is_selected)
+        self._build_ui(slide_index, total_slides)
 
-    def _build_ui(self, is_selected: bool):
+    def _build_ui(self, slide_index: int, total_slides: int):
         c = COLORS
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(14, 12, 14, 12)
-        layout.setSpacing(6)
+        root = QHBoxLayout(self)
+        root.setContentsMargins(16, 16, 20, 16)
+        root.setSpacing(22)
+
+        # Left: Circled Fault Image
+        self.img_label = QLabel()
+        self.img_label.setAlignment(Qt.AlignCenter)
+        self.img_label.setStyleSheet(f"background-color: {c.BG_SUBTLE}; border-radius: 16px;")
+        self.img_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.img_label.setMinimumSize(320, 260)
+        root.addWidget(self.img_label, stretch=63)
+
+        # Right: Large Readable Coaching Card
+        text_col = QVBoxLayout()
+        text_col.setContentsMargins(4, 8, 4, 8)
+        text_col.setSpacing(14)
 
         if self.criterion.status == "error":
-            accent = c.CRIMSON
-            pill_bg = "#FEE2E2"
-            pill_fg = c.CRIMSON_TEXT
-            pill_txt = "Fault Detected"
-            icon_name = "alert_triangle"
-            card_bg = c.CRIMSON_SOFT if is_selected else c.BG_CARD
-            border = f"2px solid {c.CRIMSON}" if is_selected else f"1px solid {c.BORDER_LIGHT}"
+            accent, pill_bg, pill_fg = c.CRIMSON, "#FEE2E2", c.CRIMSON_TEXT
+            pill_txt, icon_name = "FAULT DETECTED", "alert_triangle"
         elif self.criterion.status == "passed":
-            accent = c.EMERALD
-            pill_bg = "#D1FAE5"
-            pill_fg = c.EMERALD_TEXT
-            pill_txt = "Pro Standard"
-            icon_name = "check_circle"
-            card_bg = c.EMERALD_SOFT if is_selected else c.BG_CARD
-            border = f"2px solid {c.EMERALD}" if is_selected else f"1px solid {c.BORDER_LIGHT}"
+            accent, pill_bg, pill_fg = c.EMERALD, "#D1FAE5", c.EMERALD_TEXT
+            pill_txt, icon_name = "PRO STANDARD", "check_circle"
         else:
-            accent = c.AMBER
-            pill_bg = "#FEF3C7"
-            pill_fg = c.AMBER_TEXT
-            pill_txt = "Not Visible"
-            icon_name = "eye_off"
-            card_bg = c.AMBER_SOFT if is_selected else c.BG_CARD
-            border = f"2px solid {c.AMBER}" if is_selected else f"1px solid {c.BORDER_LIGHT}"
+            accent, pill_bg, pill_fg = c.AMBER, "#FEF3C7", c.AMBER_TEXT
+            pill_txt, icon_name = "NOT VISIBLE", "eye_off"
 
-        self.setStyleSheet(
-            f"""
-            FaultCardWidget {{
-                background-color: {card_bg};
-                border: {border};
-                border-radius: 16px;
-            }}
-            FaultCardWidget:hover {{
-                border: 1.5px solid {c.EMERALD_BRIGHT};
-                background-color: {c.BG_SUBTLE};
-            }}
-            """
-        )
-
-        # Row 1: Status Pill + Measured Telemetry
+        # Status Pill + Slide Number
         top_row = QHBoxLayout()
-        top_row.setSpacing(8)
-
         badge_wrap = QFrame()
-        badge_wrap.setStyleSheet(
-            f"background-color: {pill_bg}; border-radius: 10px; border: none;"
-        )
-        bw_layout = QHBoxLayout(badge_wrap)
-        bw_layout.setContentsMargins(8, 3, 9, 3)
-        bw_layout.setSpacing(5)
+        badge_wrap.setStyleSheet(f"background-color: {pill_bg}; border-radius: 12px; border: none;")
+        bw = QHBoxLayout(badge_wrap)
+        bw.setContentsMargins(12, 6, 14, 6)
+        bw.setSpacing(7)
 
         icon_lbl = QLabel()
-        icon_lbl.setPixmap(svg_pixmap(icon_name, color=accent, size=14, stroke_width=2.2))
-        icon_lbl.setFixedSize(15, 15)
+        icon_lbl.setPixmap(svg_pixmap(icon_name, color=accent, size=17, stroke_width=2.3))
         icon_lbl.setStyleSheet("background: transparent; border: none;")
 
         badge = QLabel(pill_txt)
         badge.setStyleSheet(
-            f"color: {pill_fg}; font-weight: 700; font-size: 11px; "
+            f"color: {pill_fg}; font-weight: 800; font-size: 12px; letter-spacing: 0.6px; "
             "background: transparent; border: none;"
         )
-        bw_layout.addWidget(icon_lbl)
-        bw_layout.addWidget(badge)
+        bw.addWidget(icon_lbl)
+        bw.addWidget(badge)
         badge_wrap.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
 
-        metric = QLabel(f"{self.criterion.measured_text}  ·  {self.criterion.standard_text}")
-        metric.setWordWrap(True)
-        metric.setStyleSheet(
-            f"color: {c.TEXT_MUTED}; font-family: {FONT_MONO}; "
-            "font-size: 11px; font-weight: 700; background: transparent; border: none;"
+        counter = QLabel(f"{slide_index + 1} / {total_slides}")
+        counter.setStyleSheet(
+            f"background-color: {c.BG_MUTED}; color: {c.TEXT_SECONDARY}; "
+            f"font-family: {FONT_MONO}; font-size: 13px; font-weight: 800; "
+            "padding: 6px 12px; border-radius: 11px;"
         )
-        metric.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        counter.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
 
         top_row.addWidget(badge_wrap)
-        top_row.addWidget(metric, stretch=1)
-        layout.addLayout(top_row)
+        top_row.addStretch()
+        top_row.addWidget(counter)
+        text_col.addLayout(top_row)
 
-        # Row 2: Title
+        # Big Title
         title = QLabel(self.criterion.title)
         title.setWordWrap(True)
         title.setStyleSheet(
-            f"color: {c.TEXT_PRIMARY}; font-size: 14px; font-weight: 700; "
-            "background: transparent; border: none;"
+            f"color: {c.TEXT_PRIMARY}; font-size: 23px; font-weight: 800; "
+            "line-height: 1.2; background: transparent; border: none;"
         )
-        layout.addWidget(title)
+        text_col.addWidget(title)
 
-        # Row 3: Explanation
+        # Metric Comparison Box
+        metric_box = QFrame()
+        metric_box.setStyleSheet(
+            f"background-color: {c.BG_SUBTLE}; border: 1px solid {c.BORDER_LIGHT}; border-radius: 14px;"
+        )
+        mb_layout = QHBoxLayout(metric_box)
+        mb_layout.setContentsMargins(14, 12, 14, 12)
+        mb_layout.setSpacing(16)
+
+        measured_col = QVBoxLayout()
+        measured_col.setSpacing(2)
+        m_hdr = QLabel("MEASURED")
+        m_hdr.setStyleSheet(f"color: {c.TEXT_MUTED}; font-size: 10px; font-weight: 800; letter-spacing: 0.7px; border: none;")
+        m_val = QLabel(self.criterion.measured_text)
+        m_val.setStyleSheet(f"color: {accent}; font-family: {FONT_MONO}; font-size: 16px; font-weight: 800; border: none;")
+        measured_col.addWidget(m_hdr)
+        measured_col.addWidget(m_val)
+
+        target_col = QVBoxLayout()
+        target_col.setSpacing(2)
+        t_hdr = QLabel("PGA TARGET")
+        t_hdr.setStyleSheet(f"color: {c.TEXT_MUTED}; font-size: 10px; font-weight: 800; letter-spacing: 0.7px; border: none;")
+        t_val = QLabel(self.criterion.standard_text)
+        t_val.setStyleSheet(f"color: {c.TEXT_PRIMARY}; font-family: {FONT_MONO}; font-size: 16px; font-weight: 800; border: none;")
+        target_col.addWidget(t_hdr)
+        target_col.addWidget(t_val)
+
+        mb_layout.addLayout(measured_col, stretch=1)
+        mb_layout.addLayout(target_col, stretch=1)
+        text_col.addWidget(metric_box)
+
+        # Explanation
         desc = QLabel(self.criterion.description)
         desc.setWordWrap(True)
         desc.setStyleSheet(
-            f"color: {c.TEXT_SECONDARY}; font-size: 12px; "
-            "background: transparent; border: none;"
+            f"color: {c.TEXT_SECONDARY}; font-size: 15px; font-weight: 500; "
+            "line-height: 1.45; background: transparent; border: none;"
         )
-        layout.addWidget(desc)
+        text_col.addWidget(desc)
 
-        # Row 4: Coaching Tip (only on error cards)
-        if self.criterion.status == "error" and self.criterion.correction_tip:
+        # Actionable Fix / Note Card
+        if self.criterion.correction_tip:
+            is_err = self.criterion.status == "error"
+            tip_bg = c.AMBER_SOFT if is_err else c.EMERALD_SOFT
+            tip_border = c.AMBER_BORDER if is_err else c.EMERALD_BORDER
+            tip_fg = c.AMBER_TEXT if is_err else c.EMERALD_TEXT
+            tip_icon = "bulb" if is_err else "check_circle"
+            tip_icon_color = c.AMBER if is_err else c.EMERALD
+
             tip_box = QFrame()
             tip_box.setStyleSheet(
-                f"background-color: {c.AMBER_SOFT}; border: 1px solid {c.AMBER_BORDER}; "
-                "border-radius: 10px;"
+                f"background-color: {tip_bg}; border: 1px solid {tip_border}; border-radius: 14px;"
             )
             tip_row = QHBoxLayout(tip_box)
-            tip_row.setContentsMargins(9, 6, 9, 6)
-            tip_row.setSpacing(6)
+            tip_row.setContentsMargins(14, 12, 14, 12)
+            tip_row.setSpacing(10)
 
             bulb_lbl = QLabel()
-            bulb_lbl.setPixmap(svg_pixmap("bulb", color=c.AMBER, size=14, stroke_width=2.1))
-            bulb_lbl.setFixedSize(16, 16)
+            bulb_lbl.setPixmap(svg_pixmap(tip_icon, color=tip_icon_color, size=18, stroke_width=2.1))
+            bulb_lbl.setFixedSize(20, 20)
             bulb_lbl.setStyleSheet("background: transparent; border: none;")
 
             tip = QLabel(self.criterion.correction_tip)
             tip.setWordWrap(True)
             tip.setStyleSheet(
-                f"color: {c.AMBER_TEXT}; font-size: 12px; font-weight: 600; "
-                "background: transparent; border: none;"
+                f"color: {tip_fg}; font-size: 14px; font-weight: 700; "
+                "line-height: 1.35; background: transparent; border: none;"
             )
-
             tip_row.addWidget(bulb_lbl)
             tip_row.addWidget(tip, stretch=1)
-            layout.addWidget(tip_box)
+            text_col.addWidget(tip_box)
 
-    def mousePressEvent(self, event):
-        if event.button() == Qt.LeftButton:
-            self.clicked.emit(self.criterion)
-        super().mousePressEvent(event)
+        text_col.addStretch()
+        root.addLayout(text_col, stretch=37)
+
+    def refresh_image(self):
+        if self._source_pixmap.isNull() or self.img_label.size().isEmpty():
+            return
+        scaled = self._source_pixmap.scaled(
+            self.img_label.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation
+        )
+        self.img_label.setPixmap(round_pixmap(scaled, radius=16))
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self.refresh_image()
+
+
+# ==============================
+# HORIZONTAL AUTO-SLIDING CAROUSEL
+# ==============================
+class HorizontalCarouselWidget(QWidget):
+    """Auto-sliding horizontal carousel holding each slide for config.SLIDE_HOLD_SECONDS."""
+
+    slide_changed = Signal(int, int)       # (current_index, total_slides)
+    hold_progress = Signal(int)            # 0..100
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.slides_data: list[tuple[np.ndarray, FaultCriterion]] = []
+        self.current_idx = 0
+        self.current_slide: SwingSlideWidget | None = None
+        self.next_slide: SwingSlideWidget | None = None
+        self._anim_group: QParallelAnimationGroup | None = None
+        self._elapsed_ms = 0
+        self._hold_ms = int(config.SLIDE_HOLD_SECONDS * 1000)
+
+        self._tick_timer = QTimer(self)
+        self._tick_timer.setInterval(50)
+        self._tick_timer.timeout.connect(self._on_tick)
+
+    def set_slides(self, slides: list[tuple[np.ndarray, FaultCriterion]]):
+        self.stop()
+        if self.current_slide is not None:
+            self.current_slide.deleteLater()
+            self.current_slide = None
+
+        self.slides_data = slides
+        self.current_idx = 0
+        self._elapsed_ms = 0
+
+        if not self.slides_data:
+            return
+
+        self.current_slide = self._create_slide_widget(0)
+        self.current_slide.setGeometry(self.rect())
+        self.current_slide.show()
+        self.current_slide.refresh_image()
+
+        self.slide_changed.emit(0, len(self.slides_data))
+        self.hold_progress.emit(0)
+
+        if len(self.slides_data) > 1:
+            self._tick_timer.start()
+
+    def stop(self):
+        self._tick_timer.stop()
+        if self._anim_group is not None:
+            self._anim_group.stop()
+            self._anim_group = None
+        if self.next_slide is not None:
+            self.next_slide.deleteLater()
+            self.next_slide = None
+
+    def step_slide(self, delta: int):
+        if len(self.slides_data) <= 1 or self._anim_group is not None:
+            return
+        self._elapsed_ms = 0
+        self.hold_progress.emit(0)
+        target = (self.current_idx + delta) % len(self.slides_data)
+        self._animate_to(target, direction=1 if delta >= 0 else -1)
+
+    def _create_slide_widget(self, idx: int) -> SwingSlideWidget:
+        img, crit = self.slides_data[idx]
+        return SwingSlideWidget(img, crit, idx, len(self.slides_data), parent=self)
+
+    def _on_tick(self):
+        if len(self.slides_data) <= 1 or self._anim_group is not None:
+            return
+        self._elapsed_ms += 50
+        pct = min(100, int((self._elapsed_ms / max(1, self._hold_ms)) * 100))
+        self.hold_progress.emit(pct)
+        if self._elapsed_ms >= self._hold_ms:
+            self._elapsed_ms = 0
+            self.hold_progress.emit(0)
+            target = (self.current_idx + 1) % len(self.slides_data)
+            self._animate_to(target, direction=1)
+
+    def _animate_to(self, target_idx: int, direction: int = 1):
+        w = max(1, self.width())
+        h = max(1, self.height())
+
+        self.next_slide = self._create_slide_widget(target_idx)
+        self.next_slide.setGeometry(direction * w, 0, w, h)
+        self.next_slide.show()
+        self.next_slide.refresh_image()
+
+        anim_old = QPropertyAnimation(self.current_slide, b"pos", self)
+        anim_old.setDuration(420)
+        anim_old.setStartValue(QPoint(0, 0))
+        anim_old.setEndValue(QPoint(-direction * w, 0))
+        anim_old.setEasingCurve(QEasingCurve.OutCubic)
+
+        anim_new = QPropertyAnimation(self.next_slide, b"pos", self)
+        anim_new.setDuration(420)
+        anim_new.setStartValue(QPoint(direction * w, 0))
+        anim_new.setEndValue(QPoint(0, 0))
+        anim_new.setEasingCurve(QEasingCurve.OutCubic)
+
+        group = QParallelAnimationGroup(self)
+        group.addAnimation(anim_old)
+        group.addAnimation(anim_new)
+        group.finished.connect(lambda: self._finish_slide(target_idx))
+        self._anim_group = group
+        group.start()
+
+    def _finish_slide(self, target_idx: int):
+        if self.current_slide is not None:
+            self.current_slide.deleteLater()
+        self.current_slide = self.next_slide
+        self.next_slide = None
+        self._anim_group = None
+        self.current_idx = target_idx
+        if self.current_slide is not None:
+            self.current_slide.setGeometry(self.rect())
+            self.current_slide.refresh_image()
+        self.slide_changed.emit(self.current_idx, len(self.slides_data))
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if self.current_slide is not None and self._anim_group is None:
+            self.current_slide.setGeometry(self.rect())
+            self.current_slide.refresh_image()
 
 
 # ==============================
@@ -356,21 +525,18 @@ class GolfAssistantWindow(QMainWindow):
         self.camera_index = camera_index
         self.state = self.STATE_LIVE
 
-        # Recording & analysis session state
+        # Headless/Kiosk configuration (toggled via keyboard if ever needed)
+        self.handedness = config.GOLFER_HANDEDNESS
+        self.mirror_enabled = config.MIRROR_CAMERA_DEFAULT
+        self.record_duration_sec = config.RECORD_SECONDS
+
+        # Session state
         self.raw_recorded_frames: list[np.ndarray] = []
         self.raw_recorded_timestamps: list[float] = []
         self.analysis_result: SwingAnalysisResult | None = None
-        self.selected_criterion: FaultCriterion | None = None
-
-        # Countdown & recording timers
         self.countdown_remaining = config.COUNTDOWN_SECONDS
-        self.record_duration_sec = config.RECORD_SECONDS
         self.record_start_time = 0.0
-
-        # Slow-motion replay state
-        self.replay_playing = False
-        self.replay_frame_idx = 0
-        self.replay_speed = 0.5
+        self._dot_labels: list[QLabel] = []
 
         self._init_ui()
         self._init_timers_and_shortcuts()
@@ -378,7 +544,6 @@ class GolfAssistantWindow(QMainWindow):
 
     def _init_ui(self):
         self.setWindowTitle("VAR Golf Studio - AI Golf Swing Analyzer")
-        # Borderless Fullscreen (zero OS chrome/titlebar/window frame)
         self.setWindowFlags(Qt.Window | Qt.FramelessWindowHint)
         self.resize(1366, 768)
         self.setStyleSheet(build_app_stylesheet())
@@ -390,10 +555,8 @@ class GolfAssistantWindow(QMainWindow):
         root_layout.setContentsMargins(14, 12, 14, 14)
         root_layout.setSpacing(12)
 
-        # 1. FLOATING WHITE TOP BAR
         root_layout.addWidget(self._build_top_bar())
 
-        # 2. MAIN WORKSPACE STACK
         self.stacked = QStackedWidget()
         self.stacked.addWidget(self._build_live_page())
         self.stacked.addWidget(self._build_result_page())
@@ -402,36 +565,35 @@ class GolfAssistantWindow(QMainWindow):
     def _build_top_bar(self) -> QFrame:
         bar = QFrame()
         bar.setObjectName("TopBar")
-        bar.setFixedHeight(64)
-        apply_soft_shadow(bar, blur=20, y_offset=4, alpha=16)
+        bar.setFixedHeight(60)
+        apply_soft_shadow(bar, blur=20, y_offset=4, alpha=15)
 
         layout = QHBoxLayout(bar)
-        layout.setContentsMargins(16, 10, 14, 10)
+        layout.setContentsMargins(16, 8, 14, 8)
         layout.setSpacing(12)
 
-        # Rounded Logo Box
         icon_box = QFrame()
         icon_box.setObjectName("BrandIconBox")
-        icon_box.setFixedSize(40, 40)
+        icon_box.setFixedSize(38, 38)
         ib_layout = QHBoxLayout(icon_box)
         ib_layout.setContentsMargins(0, 0, 0, 0)
         ib_layout.setAlignment(Qt.AlignCenter)
         logo_lbl = QLabel()
-        logo_lbl.setPixmap(svg_pixmap("target", color=COLORS.EMERALD, size=22, stroke_width=2.2))
+        logo_lbl.setPixmap(svg_pixmap("target", color=COLORS.EMERALD, size=21, stroke_width=2.2))
         logo_lbl.setStyleSheet("background: transparent; border: none;")
         ib_layout.addWidget(logo_lbl)
 
         brand_col = QVBoxLayout()
-        brand_col.setSpacing(1)
+        brand_col.setSpacing(0)
         title = QLabel("VAR Golf Studio")
         title.setObjectName("BrandTitle")
-        subtitle = QLabel("2D + 3D PGA / TPI Biomechanics Analyzer")
+        subtitle = QLabel("2D + 3D PGA / TPI Biomechanics")
         subtitle.setObjectName("BrandSubtitle")
         brand_col.addWidget(title)
         brand_col.addWidget(subtitle)
 
         self.lbl_status_pill = QLabel("Ready")
-        self.lbl_status_pill.setObjectName("StatusPill")
+        self._set_status_pill("Ready", COLORS.EMERALD_TEXT, COLORS.EMERALD_SOFT, COLORS.EMERALD_BORDER)
 
         layout.addWidget(icon_box)
         layout.addLayout(brand_col)
@@ -439,44 +601,28 @@ class GolfAssistantWindow(QMainWindow):
         layout.addWidget(self.lbl_status_pill)
         layout.addStretch()
 
-        # Handedness
-        lbl_hand = QLabel("Handedness")
-        lbl_hand.setObjectName("TopControlLabel")
-        self.combo_handedness = QComboBox()
-        self.combo_handedness.addItem("Right-Handed", "right")
-        self.combo_handedness.addItem("Left-Handed", "left")
+        self.lbl_view_pill = QLabel("")
+        self.lbl_view_pill.setObjectName("MetaPill")
+        self.lbl_view_pill.setVisible(False)
 
-        # Duration
-        lbl_dur = QLabel("Duration")
-        lbl_dur.setObjectName("TopControlLabel")
-        self.combo_duration = QComboBox()
-        self.combo_duration.addItem("10s (Recommended)", 10)
-        self.combo_duration.addItem("8s", 8)
-        self.combo_duration.addItem("12s", 12)
-        self.combo_duration.addItem("5s (Quick Test)", 5)
-        self.combo_duration.currentIndexChanged.connect(self._on_duration_changed)
+        self.lbl_score_pill = QLabel("")
+        self.lbl_score_pill.setObjectName("ScorePill")
+        self.lbl_score_pill.setVisible(False)
 
-        # Mirror
-        self.chk_mirror = QCheckBox("Mirror View")
-        self.chk_mirror.setChecked(True)
+        self.lbl_mode_pill = QLabel("Right-Handed  ·  10s")
+        self.lbl_mode_pill.setObjectName("MetaPill")
 
-        # Close button (since window is borderless fullscreen)
         self.btn_exit = QPushButton()
         self.btn_exit.setObjectName("ExitBtn")
-        self.btn_exit.setIcon(svg_icon("x_close", color=COLORS.TEXT_MUTED, size=17))
-        self.btn_exit.setIconSize(QSize(17, 17))
-        self.btn_exit.setToolTip("Exit Application [Ctrl+Q]")
+        self.btn_exit.setIcon(svg_icon("x_close", color=COLORS.TEXT_MUTED, size=16))
+        self.btn_exit.setIconSize(QSize(16, 16))
+        self.btn_exit.setToolTip("Exit [Ctrl+Q]")
         self.btn_exit.setCursor(Qt.PointingHandCursor)
         self.btn_exit.clicked.connect(self.close)
 
-        layout.addWidget(lbl_hand)
-        layout.addWidget(self.combo_handedness)
-        layout.addSpacing(4)
-        layout.addWidget(lbl_dur)
-        layout.addWidget(self.combo_duration)
-        layout.addSpacing(4)
-        layout.addWidget(self.chk_mirror)
-        layout.addSpacing(4)
+        layout.addWidget(self.lbl_view_pill)
+        layout.addWidget(self.lbl_score_pill)
+        layout.addWidget(self.lbl_mode_pill)
         layout.addWidget(self.btn_exit)
         return bar
 
@@ -486,10 +632,9 @@ class GolfAssistantWindow(QMainWindow):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(12)
 
-        # White Rounded Stage Card
         stage = QFrame()
         stage.setObjectName("StageCard")
-        apply_soft_shadow(stage, blur=26, y_offset=6, alpha=18)
+        apply_soft_shadow(stage, blur=26, y_offset=6, alpha=16)
         stage_layout = QVBoxLayout(stage)
         stage_layout.setContentsMargins(10, 10, 10, 10)
 
@@ -498,25 +643,24 @@ class GolfAssistantWindow(QMainWindow):
         self.live_viewer.setStyleSheet(
             f"background-color: {COLORS.BG_SUBTLE}; border-radius: 16px; "
             f"border: 1px dashed {COLORS.BORDER_MEDIUM}; "
-            f"color: {COLORS.TEXT_MUTED}; font-size: 15px; font-weight: 600;"
+            f"color: {COLORS.TEXT_MUTED}; font-size: 16px; font-weight: 600;"
         )
         self.live_viewer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.live_viewer.setMinimumHeight(440)
         stage_layout.addWidget(self.live_viewer)
         layout.addWidget(stage, stretch=1)
 
-        # Bottom Floating Control Dock
         dock = QFrame()
         dock.setObjectName("ControlDock")
         apply_soft_shadow(dock, blur=20, y_offset=4, alpha=14)
         dock_layout = QHBoxLayout(dock)
-        dock_layout.setContentsMargins(20, 12, 20, 12)
+        dock_layout.setContentsMargins(22, 12, 22, 12)
         dock_layout.setSpacing(16)
 
         left_info = QVBoxLayout()
         left_info.setSpacing(6)
         self.lbl_live_status = QLabel(
-            "Stand full-body inside the frame (Face-On or Down-the-Line angle is auto-detected)."
+            "Press [SPACE] or Foot Pedal to start 5s countdown, then swing naturally."
         )
         self.lbl_live_status.setObjectName("LiveHintLabel")
         self.lbl_live_status.setWordWrap(True)
@@ -531,15 +675,14 @@ class GolfAssistantWindow(QMainWindow):
         left_info.addWidget(self.progress_bar)
         dock_layout.addLayout(left_info, stretch=1)
 
-        # Buttons
-        self.btn_start = QPushButton(" Start Recording & Analyze [SPACE]")
+        self.btn_start = QPushButton(" Start Recording [SPACE]")
         self.btn_start.setObjectName("PrimaryCTA")
         self.btn_start.setIcon(svg_icon("play", color="#FFFFFF", size=17))
         self.btn_start.setIconSize(QSize(17, 17))
         self.btn_start.setCursor(Qt.PointingHandCursor)
         self.btn_start.clicked.connect(self._on_start_clicked)
 
-        self.btn_stop_early = QPushButton(" Stop Early & Analyze Now")
+        self.btn_stop_early = QPushButton(" Analyze Now [SPACE]")
         self.btn_stop_early.setObjectName("DangerCTA")
         self.btn_stop_early.setIcon(svg_icon("stop", color="#FFFFFF", size=15))
         self.btn_stop_early.setIconSize(QSize(15, 15))
@@ -563,222 +706,76 @@ class GolfAssistantWindow(QMainWindow):
 
     def _build_result_page(self) -> QWidget:
         page = QWidget()
-        main_split = QHBoxLayout(page)
-        main_split.setContentsMargins(0, 0, 0, 0)
-        main_split.setSpacing(14)
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(12)
 
-        # === LEFT STAGE: SNAPSHOT & SLOW-MOTION ===
-        left_col = QVBoxLayout()
-        left_col.setSpacing(10)
+        # Horizontal Sliding Carousel Stage
+        self.carousel = HorizontalCarouselWidget()
+        self.carousel.slide_changed.connect(self._on_carousel_slide_changed)
+        self.carousel.hold_progress.connect(self._on_carousel_hold_progress)
+        layout.addWidget(self.carousel, stretch=1)
 
-        # Segmented Switcher Pill + Camera View Badge
-        top_strip = QHBoxLayout()
-        top_strip.setSpacing(10)
+        # Minimal Bottom Footer: Timer Progress + Dots + Next Swing Prompt
+        footer = QFrame()
+        footer.setObjectName("ControlDock")
+        apply_soft_shadow(footer, blur=20, y_offset=4, alpha=14)
+        footer_col = QVBoxLayout(footer)
+        footer_col.setContentsMargins(20, 10, 20, 12)
+        footer_col.setSpacing(8)
 
-        seg_track = QFrame()
-        seg_track.setObjectName("SegmentTrack")
-        seg_layout = QHBoxLayout(seg_track)
-        seg_layout.setContentsMargins(4, 4, 4, 4)
-        seg_layout.setSpacing(4)
+        self.slide_timer_bar = QProgressBar()
+        self.slide_timer_bar.setObjectName("SlideTimerBar")
+        self.slide_timer_bar.setTextVisible(False)
+        self.slide_timer_bar.setRange(0, 100)
+        self.slide_timer_bar.setValue(0)
+        footer_col.addWidget(self.slide_timer_bar)
 
-        self.btn_tab_snapshot = QPushButton(" Fault Snapshot")
-        self.btn_tab_snapshot.setObjectName("SegmentBtn")
-        self.btn_tab_snapshot.setIcon(svg_icon("image", color=COLORS.EMERALD_TEXT, size=16))
-        self.btn_tab_snapshot.setCursor(Qt.PointingHandCursor)
-        self.btn_tab_snapshot.clicked.connect(lambda: self._switch_result_tab(0))
+        row = QHBoxLayout()
+        row.setSpacing(12)
 
-        self.btn_tab_replay = QPushButton(" Slow-Motion Replay")
-        self.btn_tab_replay.setObjectName("SegmentBtn")
-        self.btn_tab_replay.setIcon(svg_icon("video", color=COLORS.TEXT_MUTED, size=16))
-        self.btn_tab_replay.setCursor(Qt.PointingHandCursor)
-        self.btn_tab_replay.clicked.connect(lambda: self._switch_result_tab(1))
-
-        seg_layout.addWidget(self.btn_tab_snapshot)
-        seg_layout.addWidget(self.btn_tab_replay)
-
-        self.lbl_view_badge = QLabel("Camera: Face-On View")
-        self.lbl_view_badge.setObjectName("ViewBadge")
-
-        top_strip.addWidget(seg_track)
-        top_strip.addStretch()
-        top_strip.addWidget(self.lbl_view_badge)
-        left_col.addLayout(top_strip)
-
-        # White Rounded Stage
-        stage = QFrame()
-        stage.setObjectName("StageCard")
-        apply_soft_shadow(stage, blur=26, y_offset=6, alpha=18)
-        stage_layout = QVBoxLayout(stage)
-        stage_layout.setContentsMargins(10, 10, 10, 10)
-
-        self.result_viewer = QLabel()
-        self.result_viewer.setAlignment(Qt.AlignCenter)
-        self.result_viewer.setStyleSheet(
-            f"background-color: {COLORS.BG_SUBTLE}; border-radius: 16px;"
+        self.lbl_summary_pill = QLabel("Swing Report")
+        self.lbl_summary_pill.setStyleSheet(
+            f"color: {COLORS.TEXT_PRIMARY}; font-size: 14px; font-weight: 700;"
         )
-        self.result_viewer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.result_viewer.setMinimumHeight(440)
-        stage_layout.addWidget(self.result_viewer)
-        left_col.addWidget(stage, stretch=1)
 
-        # Stacked Controls under Result Stage
-        self.result_controls_stack = QStackedWidget()
-        self.result_controls_stack.setFixedHeight(74)
+        self.dots_container = QHBoxLayout()
+        self.dots_container.setSpacing(6)
 
-        # Tab 0: 4-Phase Timeline Bar
-        snap_dock = QFrame()
-        snap_dock.setObjectName("ControlDock")
-        apply_soft_shadow(snap_dock, blur=18, y_offset=4, alpha=14)
-        snap_ctrl = QHBoxLayout(snap_dock)
-        snap_ctrl.setContentsMargins(16, 10, 16, 10)
-        snap_ctrl.setSpacing(8)
-
-        self.lbl_snap_info = QLabel("Inspecting swing posture...")
-        self.lbl_snap_info.setStyleSheet(
-            f"color: {COLORS.TEXT_SECONDARY}; font-size: 12px; font-weight: 600;"
-        )
-        snap_ctrl.addWidget(self.lbl_snap_info, stretch=1)
-
-        self.btn_jump_addr = QPushButton("Address")
-        self.btn_jump_top = QPushButton("Top")
-        self.btn_jump_imp = QPushButton("Impact")
-        self.btn_jump_fin = QPushButton("Finish")
-        for btn, phase_key in (
-            (self.btn_jump_addr, "address"),
-            (self.btn_jump_top, "top"),
-            (self.btn_jump_imp, "impact"),
-            (self.btn_jump_fin, "finish"),
-        ):
-            btn.setObjectName("PhaseBtn")
-            btn.setCursor(Qt.PointingHandCursor)
-            btn.clicked.connect(lambda _=False, p=phase_key: self._show_phase_snapshot(p))
-            snap_ctrl.addWidget(btn)
-
-        # Tab 1: Slow-Motion Controls
-        replay_dock = QFrame()
-        replay_dock.setObjectName("ControlDock")
-        apply_soft_shadow(replay_dock, blur=18, y_offset=4, alpha=14)
-        replay_ctrl = QHBoxLayout(replay_dock)
-        replay_ctrl.setContentsMargins(16, 10, 16, 10)
-        replay_ctrl.setSpacing(10)
-
-        self.btn_play_pause = QPushButton(" Play")
-        self.btn_play_pause.setObjectName("SecondaryBtn")
-        self.btn_play_pause.setIcon(svg_icon("play", color=COLORS.TEXT_PRIMARY, size=15))
-        self.btn_play_pause.setCursor(Qt.PointingHandCursor)
-        self.btn_play_pause.clicked.connect(self._toggle_replay_play)
-
-        self.replay_slider = QSlider(Qt.Horizontal)
-        self.replay_slider.setMinimum(0)
-        self.replay_slider.valueChanged.connect(self._on_replay_slider_moved)
-
-        self.lbl_replay_time = QLabel("000 / 000")
-        self.lbl_replay_time.setObjectName("MetricValue")
-
-        self.combo_speed = QComboBox()
-        self.combo_speed.addItem("0.25x Ultra Slow", 0.25)
-        self.combo_speed.addItem("0.50x Slow", 0.5)
-        self.combo_speed.addItem("1.00x Normal", 1.0)
-        self.combo_speed.setCurrentIndex(1)
-        self.combo_speed.currentIndexChanged.connect(self._on_speed_changed)
-
-        replay_ctrl.addWidget(self.btn_play_pause)
-        replay_ctrl.addWidget(self.replay_slider, stretch=1)
-        replay_ctrl.addWidget(self.lbl_replay_time)
-        replay_ctrl.addWidget(self.combo_speed)
-
-        self.result_controls_stack.addWidget(snap_dock)
-        self.result_controls_stack.addWidget(replay_dock)
-        left_col.addWidget(self.result_controls_stack)
-
-        main_split.addLayout(left_col, stretch=63)
-
-        # === RIGHT PANEL: WHITE ROUNDED BIOMECHANICS PANEL ===
-        right_panel = QFrame()
-        right_panel.setObjectName("RightPanel")
-        right_panel.setMinimumWidth(400)
-        right_panel.setMaximumWidth(490)
-        apply_soft_shadow(right_panel, blur=26, y_offset=6, alpha=18)
-
-        right_col = QVBoxLayout(right_panel)
-        right_col.setContentsMargins(18, 16, 18, 18)
-        right_col.setSpacing(12)
-
-        # Header row
-        diag_header = QHBoxLayout()
-        lbl_diag = QLabel("SWING BIOMECHANICS")
-        lbl_diag.setObjectName("SectionHeading")
-        self.lbl_score_pill = QLabel("Passed 0/0")
-        self.lbl_score_pill.setObjectName("ScorePill")
-        diag_header.addWidget(lbl_diag)
-        diag_header.addStretch()
-        diag_header.addWidget(self.lbl_score_pill)
-        right_col.addLayout(diag_header)
-
-        # Summary Banner
-        self.summary_box = QFrame()
-        sum_layout = QHBoxLayout(self.summary_box)
-        sum_layout.setContentsMargins(14, 12, 14, 12)
-        sum_layout.setSpacing(10)
-        self.lbl_summary_icon = QLabel()
-        self.lbl_summary_icon.setFixedSize(22, 22)
-        self.lbl_summary_icon.setStyleSheet("background: transparent; border: none;")
-        self.lbl_summary_banner = QLabel("Summarizing...")
-        self.lbl_summary_banner.setWordWrap(True)
-        self.lbl_summary_banner.setStyleSheet(
-            "font-size: 13px; font-weight: 800; background: transparent; border: none;"
-        )
-        sum_layout.addWidget(self.lbl_summary_icon)
-        sum_layout.addWidget(self.lbl_summary_banner, stretch=1)
-        right_col.addWidget(self.summary_box)
-
-        lbl_hint_card = QLabel("Select any criterion card to highlight the joint zone on frame:")
-        lbl_hint_card.setWordWrap(True)
-        lbl_hint_card.setStyleSheet(f"color: {COLORS.TEXT_MUTED}; font-size: 12px;")
-        right_col.addWidget(lbl_hint_card)
-
-        class _FittedScrollArea(QScrollArea):
-            def resizeEvent(self, ev):
-                super().resizeEvent(ev)
-                if self.widget() is not None:
-                    self.widget().setMaximumWidth(max(100, self.viewport().width()))
-
-        scroll = _FittedScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.cards_container = QWidget()
-        self.cards_container.setStyleSheet("background: transparent;")
-        self.cards_layout = QVBoxLayout(self.cards_container)
-        self.cards_layout.setContentsMargins(0, 2, 8, 2)
-        self.cards_layout.setSpacing(10)
-        self.cards_layout.addStretch()
-        scroll.setWidget(self.cards_container)
-        right_col.addWidget(scroll, stretch=1)
-
-        # Retry CTA
-        self.btn_retry = QPushButton(" New Swing [R]")
+        self.btn_retry = QPushButton(" New Swing [SPACE]")
         self.btn_retry.setObjectName("PrimaryCTA")
         self.btn_retry.setIcon(svg_icon("rotate_ccw", color="#FFFFFF", size=17))
         self.btn_retry.setIconSize(QSize(17, 17))
         self.btn_retry.setCursor(Qt.PointingHandCursor)
         self.btn_retry.clicked.connect(self._restart_to_live)
-        right_col.addWidget(self.btn_retry)
 
-        main_split.addWidget(right_panel, stretch=37)
+        row.addWidget(self.lbl_summary_pill)
+        row.addSpacing(12)
+        row.addLayout(self.dots_container)
+        row.addStretch()
+        row.addWidget(self.btn_retry)
+        footer_col.addLayout(row)
+
+        layout.addWidget(footer)
         return page
 
-    # --- TIMERS & SHORTCUTS ---
+    # --- TIMERS & KEYBOARD CONTROLS ---
     def _init_timers_and_shortcuts(self):
         self.countdown_timer = QTimer(self)
         self.countdown_timer.setInterval(1000)
         self.countdown_timer.timeout.connect(self._on_countdown_tick)
 
-        self.replay_timer = QTimer(self)
-        self.replay_timer.timeout.connect(self._on_replay_tick)
+        self._notice_reset_timer = QTimer(self)
+        self._notice_reset_timer.setSingleShot(True)
+        self._notice_reset_timer.timeout.connect(self._reset_live_controls)
 
         QShortcut(QKeySequence(Qt.Key_Space), self).activated.connect(self._on_space_shortcut)
         QShortcut(QKeySequence(Qt.Key_Escape), self).activated.connect(self._on_cancel_clicked)
         QShortcut(QKeySequence("R"), self).activated.connect(self._on_retry_shortcut)
+        QShortcut(QKeySequence(Qt.Key_Left), self).activated.connect(lambda: self._step_carousel(-1))
+        QShortcut(QKeySequence(Qt.Key_Right), self).activated.connect(lambda: self._step_carousel(1))
+        QShortcut(QKeySequence("H"), self).activated.connect(self._toggle_handedness)
+        QShortcut(QKeySequence("M"), self).activated.connect(self._toggle_mirror)
         QShortcut(QKeySequence(Qt.Key_F11), self).activated.connect(self._toggle_fullscreen)
         QShortcut(QKeySequence("Ctrl+Q"), self).activated.connect(self.close)
 
@@ -788,13 +785,27 @@ class GolfAssistantWindow(QMainWindow):
         else:
             self.showFullScreen()
 
+    def _toggle_handedness(self):
+        if self.state != self.STATE_LIVE:
+            return
+        self.handedness = "left" if self.handedness == "right" else "right"
+        hand_lbl = "Right-Handed" if self.handedness == "right" else "Left-Handed"
+        self.lbl_mode_pill.setText(f"{hand_lbl}  ·  {self.record_duration_sec}s")
+
+    def _toggle_mirror(self):
+        self.mirror_enabled = not self.mirror_enabled
+
+    def _step_carousel(self, delta: int):
+        if self.state == self.STATE_RESULT:
+            self.carousel.step_slide(delta)
+
     def _on_space_shortcut(self):
         if self.state == self.STATE_LIVE:
             self._on_start_clicked()
         elif self.state == self.STATE_RECORDING:
             self._finish_recording_and_analyze()
-        elif self.state == self.STATE_RESULT and self.result_controls_stack.currentIndex() == 1:
-            self._toggle_replay_play()
+        elif self.state == self.STATE_RESULT:
+            self._restart_to_live()
 
     def _on_retry_shortcut(self):
         if self.state == self.STATE_RESULT:
@@ -804,7 +815,7 @@ class GolfAssistantWindow(QMainWindow):
         self.lbl_status_pill.setText(text)
         self.lbl_status_pill.setStyleSheet(
             f"background-color: {bg}; color: {fg}; border: 1px solid {border}; "
-            "border-radius: 14px; padding: 4px 12px; font-size: 11px; font-weight: 700;"
+            "border-radius: 13px; padding: 4px 12px; font-size: 11px; font-weight: 700;"
         )
 
     # --- CAMERA & LIVE LOOP ---
@@ -819,13 +830,10 @@ class GolfAssistantWindow(QMainWindow):
         self.live_viewer.setStyleSheet(
             f"background-color: {COLORS.CRIMSON_SOFT}; border-radius: 16px; "
             f"border: 1px dashed {COLORS.CRIMSON_BORDER}; "
-            f"color: {COLORS.CRIMSON_TEXT}; font-size: 14px; font-weight: 600;"
+            f"color: {COLORS.CRIMSON_TEXT}; font-size: 15px; font-weight: 600;"
         )
         self.btn_start.setEnabled(False)
         self._set_status_pill("Camera Offline", COLORS.CRIMSON_TEXT, COLORS.CRIMSON_SOFT, COLORS.CRIMSON_BORDER)
-
-    def _on_duration_changed(self):
-        self.record_duration_sec = int(self.combo_duration.currentData())
 
     def _on_camera_frame(self, frame_bgr: np.ndarray, timestamp_ms: float):
         if self.state in (self.STATE_ANALYZING, self.STATE_RESULT):
@@ -838,7 +846,7 @@ class GolfAssistantWindow(QMainWindow):
             elapsed = time.perf_counter() - self.record_start_time
             remaining = max(0.0, self.record_duration_sec - elapsed)
             self.lbl_live_status.setText(
-                f"Recording Golf Swing... {remaining:.1f}s remaining (Press SPACE to analyze early)"
+                f"Recording Golf Swing... {remaining:.1f}s left (Press SPACE to analyze early)"
             )
             if elapsed >= self.record_duration_sec:
                 self._finish_recording_and_analyze()
@@ -848,7 +856,7 @@ class GolfAssistantWindow(QMainWindow):
             self._live_has_video = True
             self.live_viewer.setStyleSheet("background-color: transparent; border: none; border-radius: 16px;")
 
-        disp = cv2.flip(frame_bgr, 1) if self.chk_mirror.isChecked() else frame_bgr
+        disp = cv2.flip(frame_bgr, 1) if self.mirror_enabled else frame_bgr
         pix = bgr_to_pixmap(disp)
         if not self.live_viewer.size().isEmpty():
             pix = pix.scaled(self.live_viewer.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation)
@@ -861,7 +869,6 @@ class GolfAssistantWindow(QMainWindow):
         painter.setRenderHint(QPainter.Antialiasing, True)
         w, h = pix.width(), pix.height()
 
-        # Subtle Corner Alignment Reticle Brackets
         if self.state in (self.STATE_LIVE, self.STATE_COUNTDOWN, self.STATE_RECORDING):
             bracket_color = QColor("#10B981" if self.state == self.STATE_RECORDING else "#FFFFFF")
             bracket_color.setAlpha(200 if self.state == self.STATE_RECORDING else 135)
@@ -943,15 +950,13 @@ class GolfAssistantWindow(QMainWindow):
     def _on_start_clicked(self):
         if self.state != self.STATE_LIVE:
             return
-        self.record_duration_sec = int(self.combo_duration.currentData())
+        self._notice_reset_timer.stop()
         self.countdown_remaining = config.COUNTDOWN_SECONDS
         self.state = self.STATE_COUNTDOWN
 
         self.btn_start.setVisible(False)
         self.btn_cancel.setVisible(True)
         self.btn_stop_early.setVisible(False)
-        self.combo_handedness.setEnabled(False)
-        self.combo_duration.setEnabled(False)
 
         self._set_status_pill(
             f"Countdown {self.countdown_remaining}s",
@@ -959,7 +964,7 @@ class GolfAssistantWindow(QMainWindow):
             COLORS.AMBER_SOFT,
             COLORS.AMBER_BORDER,
         )
-        self.lbl_live_status.setText(f"Get ready... Recording starts in {self.countdown_remaining} seconds!")
+        self.lbl_live_status.setText(f"Get ready... Recording starts in {self.countdown_remaining}s!")
         self.countdown_timer.start()
 
     def _on_countdown_tick(self):
@@ -971,7 +976,7 @@ class GolfAssistantWindow(QMainWindow):
                 COLORS.AMBER_SOFT,
                 COLORS.AMBER_BORDER,
             )
-            self.lbl_live_status.setText(f"Get ready... Recording starts in {self.countdown_remaining} seconds!")
+            self.lbl_live_status.setText(f"Get ready... Recording starts in {self.countdown_remaining}s!")
         else:
             self.countdown_timer.stop()
             self._begin_recording()
@@ -1002,11 +1007,12 @@ class GolfAssistantWindow(QMainWindow):
         self.btn_stop_early.setVisible(False)
         self.progress_bar.setVisible(False)
         self.progress_bar.setValue(0)
-        self.combo_handedness.setEnabled(True)
-        self.combo_duration.setEnabled(True)
+        self.lbl_view_pill.setVisible(False)
+        self.lbl_score_pill.setVisible(False)
+        self.lbl_mode_pill.setVisible(True)
         self._set_status_pill("Ready", COLORS.EMERALD_TEXT, COLORS.EMERALD_SOFT, COLORS.EMERALD_BORDER)
         self.lbl_live_status.setText(
-            "Stand full-body inside the frame (Face-On or Down-the-Line angle is auto-detected)."
+            "Press [SPACE] or Foot Pedal to start 5s countdown, then swing naturally."
         )
 
     def _finish_recording_and_analyze(self):
@@ -1019,145 +1025,46 @@ class GolfAssistantWindow(QMainWindow):
         self.progress_bar.setValue(0)
         self._set_status_pill("Analyzing", COLORS.BLUE_TEXT, COLORS.BLUE_SOFT, COLORS.BLUE_BORDER)
         self.lbl_live_status.setText(
-            f"Running 2D + 3D AI pose tracking & biomechanics scoring ({len(self.raw_recorded_frames)} frames)..."
+            f"Running 2D + 3D biomechanics analysis ({len(self.raw_recorded_frames)} frames)..."
         )
 
-        handedness = self.combo_handedness.currentData()
         self.analysis_worker = AnalysisWorker(
-            self.raw_recorded_frames, self.raw_recorded_timestamps, handedness
+            self.raw_recorded_frames, self.raw_recorded_timestamps, self.handedness
         )
         self.analysis_worker.progress_updated.connect(self.progress_bar.setValue)
         self.analysis_worker.analysis_finished.connect(self._on_analysis_finished)
         self.analysis_worker.analysis_failed.connect(self._on_analysis_failed)
         self.analysis_worker.start()
 
-    def _on_analysis_failed(self, err: str):
-        QMessageBox.critical(self, "AI Analysis Error", f"An error occurred during swing analysis:\n{err}")
+    def _show_nonblocking_live_notice(self, pill_txt: str, status_msg: str):
+        """Show auto-recovering status on live screen so kiosk never blocks on mouse dialogs."""
         self.state = self.STATE_LIVE
         self._reset_live_controls()
+        self._set_status_pill(pill_txt, COLORS.AMBER_TEXT, COLORS.AMBER_SOFT, COLORS.AMBER_BORDER)
+        self.lbl_live_status.setText(status_msg)
+        self._notice_reset_timer.start(4000)
+
+    def _on_analysis_failed(self, err: str):
+        self._show_nonblocking_live_notice(
+            "Analysis Retry",
+            f"Analysis interrupted ({err}). Press [SPACE] to record again.",
+        )
 
     def _on_analysis_finished(self, result: SwingAnalysisResult):
         self.analysis_result = result
         if not result.person_detected or not result.criteria:
-            QMessageBox.information(
-                self,
-                "Player Not Detected",
-                "AI could not clearly track your full body in the recorded clip.\n"
-                "Please ensure good lighting and stand far enough back to frame head to toe.",
+            self._show_nonblocking_live_notice(
+                "No Player Detected",
+                "Player was not clearly visible head-to-toe. Step back slightly and press [SPACE] to try again.",
             )
-            self.state = self.STATE_LIVE
-            self._reset_live_controls()
             return
 
         self.state = self.STATE_RESULT
-        self._set_status_pill("Analysis Complete", COLORS.EMERALD_TEXT, COLORS.EMERALD_SOFT, COLORS.EMERALD_BORDER)
+        self._set_status_pill("Swing Report", COLORS.EMERALD_TEXT, COLORS.EMERALD_SOFT, COLORS.EMERALD_BORDER)
         self.stacked.setCurrentIndex(1)
-        self._populate_result_ui()
-        QTimer.singleShot(0, self._refresh_active_result_view)
+        QTimer.singleShot(0, self._populate_result_carousel)
 
-    def _refresh_active_result_view(self):
-        if self.state != self.STATE_RESULT:
-            return
-        if self.result_controls_stack.currentIndex() == 0:
-            self._render_selected_snapshot()
-        else:
-            self._render_replay_frame(self.replay_frame_idx)
-
-    # --- RESULT PRESENTATION ---
-    def _populate_result_ui(self):
-        res = self.analysis_result
-        errors = [c for c in res.criteria if c.status == "error"]
-
-        view_txt = (
-            "Camera: Face-On View"
-            if res.camera_view == "face_on"
-            else "Camera: Down-the-Line (DTL)"
-        )
-        self.lbl_view_badge.setText(view_txt)
-        self.lbl_score_pill.setText(f"Passed {res.score_passed}/{res.score_evaluated}")
-
-        if errors:
-            self.lbl_summary_icon.setPixmap(svg_pixmap("alert_triangle", color=COLORS.CRIMSON, size=20))
-            noun = "Swing Fault" if len(errors) == 1 else "Swing Faults"
-            self.lbl_summary_banner.setText(
-                f"{len(errors)} {noun} Detected  (Passed {res.score_passed}/{res.score_evaluated})"
-            )
-            self.lbl_summary_banner.setStyleSheet(
-                f"color: {COLORS.CRIMSON_TEXT}; font-size: 13px; font-weight: 800; background: transparent; border: none;"
-            )
-            self.summary_box.setStyleSheet(
-                f"background-color: {COLORS.CRIMSON_SOFT}; border: 1px solid {COLORS.CRIMSON_BORDER}; border-radius: 16px;"
-            )
-        else:
-            self.lbl_summary_icon.setPixmap(svg_pixmap("check_circle", color=COLORS.EMERALD, size=20))
-            self.lbl_summary_banner.setText(
-                f"Excellent! Passed All {res.score_passed}/{res.score_evaluated} Criteria"
-            )
-            self.lbl_summary_banner.setStyleSheet(
-                f"color: {COLORS.EMERALD_TEXT}; font-size: 13px; font-weight: 800; background: transparent; border: none;"
-            )
-            self.summary_box.setStyleSheet(
-                f"background-color: {COLORS.EMERALD_SOFT}; border: 1px solid {COLORS.EMERALD_BORDER}; border-radius: 16px;"
-            )
-
-        self.selected_criterion = errors[0] if errors else res.criteria[0]
-        self._rebuild_fault_cards()
-
-        self.replay_slider.blockSignals(True)
-        self.replay_slider.setMaximum(max(0, res.total_frames - 1))
-        self.replay_slider.setValue(res.top_idx)
-        self.replay_slider.blockSignals(False)
-        self.replay_frame_idx = res.top_idx
-        self.replay_playing = False
-        self._update_play_pause_button()
-
-        self._switch_result_tab(0)
-
-    def _rebuild_fault_cards(self):
-        while self.cards_layout.count() > 1:
-            item = self.cards_layout.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
-
-        for crit in self.analysis_result.criteria:
-            is_sel = self.selected_criterion is not None and crit.code == self.selected_criterion.code
-            card = FaultCardWidget(crit, is_selected=is_sel)
-            card.clicked.connect(self._on_fault_card_clicked)
-            self.cards_layout.insertWidget(self.cards_layout.count() - 1, card)
-
-    def _on_fault_card_clicked(self, criterion: FaultCriterion):
-        self.selected_criterion = criterion
-        self._rebuild_fault_cards()
-        self._switch_result_tab(0)
-
-    def _switch_result_tab(self, tab_idx: int):
-        self.result_controls_stack.setCurrentIndex(tab_idx)
-        if tab_idx == 0:
-            self.replay_timer.stop()
-            self.replay_playing = False
-            self._update_play_pause_button()
-
-            self.btn_tab_snapshot.setProperty("active", "emerald")
-            self.btn_tab_snapshot.setIcon(svg_icon("image", color=COLORS.EMERALD_TEXT, size=16))
-            self.btn_tab_replay.setProperty("active", "false")
-            self.btn_tab_replay.setIcon(svg_icon("video", color=COLORS.TEXT_MUTED, size=16))
-            self._refresh_button_style(self.btn_tab_snapshot)
-            self._refresh_button_style(self.btn_tab_replay)
-            self._render_selected_snapshot()
-        else:
-            self.btn_tab_snapshot.setProperty("active", "false")
-            self.btn_tab_snapshot.setIcon(svg_icon("image", color=COLORS.TEXT_MUTED, size=16))
-            self.btn_tab_replay.setProperty("active", "true")
-            self.btn_tab_replay.setIcon(svg_icon("video", color=COLORS.BLUE_TEXT, size=16))
-            self._refresh_button_style(self.btn_tab_snapshot)
-            self._refresh_button_style(self.btn_tab_replay)
-            self._render_replay_frame(self.replay_frame_idx)
-
-    @staticmethod
-    def _refresh_button_style(btn: QPushButton):
-        btn.style().unpolish(btn)
-        btn.style().polish(btn)
-
+    # --- RESULT CAROUSEL ---
     def _get_phase_label(self, frame_idx: int) -> str:
         res = self.analysis_result
         if abs(frame_idx - res.address_idx) <= 3:
@@ -1170,20 +1077,14 @@ class GolfAssistantWindow(QMainWindow):
             return f"FINISH | Frame {frame_idx}/{res.total_frames}"
         return f"FAULT MOMENT | Frame {frame_idx}/{res.total_frames}"
 
-    def _render_selected_snapshot(self, override_frame_idx: int | None = None):
-        if not self.analysis_result or not self.selected_criterion:
-            return
-
+    def _render_criterion_image(self, crit: FaultCriterion) -> np.ndarray:
         res = self.analysis_result
-        crit = self.selected_criterion
-        idx = override_frame_idx if override_frame_idx is not None else crit.frame_idx
-        idx = max(0, min(idx, res.total_frames - 1))
-
+        idx = max(0, min(crit.frame_idx, res.total_frames - 1))
         raw_frame = self.raw_recorded_frames[idx]
         lm = res.landmarks_per_frame[idx]
-        h, w, _ = raw_frame.shape
+        _, w, _ = raw_frame.shape
 
-        if self.chk_mirror.isChecked():
+        if self.mirror_enabled:
             disp_frame = cv2.flip(raw_frame, 1)
             disp_lm = mirror_landmarks(lm, w)
             disp_crit = mirror_criterion(crit, w)
@@ -1192,123 +1093,83 @@ class GolfAssistantWindow(QMainWindow):
             disp_lm = lm
             disp_crit = crit
 
-        phase_txt = self._get_phase_label(idx)
-        annotated = render_annotated_snapshot(disp_frame, disp_lm, disp_crit, phase_label=phase_txt)
-        pix = bgr_to_pixmap(annotated)
-        if not self.result_viewer.size().isEmpty():
-            pix = pix.scaled(self.result_viewer.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation)
-        self.result_viewer.setPixmap(round_pixmap(pix, radius=16))
-        self.lbl_snap_info.setText(f"Inspecting: {crit.title} ({phase_txt})")
+        return render_annotated_snapshot(
+            disp_frame, disp_lm, disp_crit, phase_label=self._get_phase_label(idx)
+        )
 
-    def _show_phase_snapshot(self, phase: str):
-        if not self.analysis_result:
-            return
-        phase_map = {
-            "address": self.analysis_result.address_idx,
-            "top": self.analysis_result.top_idx,
-            "impact": self.analysis_result.impact_idx,
-            "finish": self.analysis_result.finish_idx,
-        }
-        idx = phase_map.get(phase, self.analysis_result.top_idx)
-        self._render_selected_snapshot(override_frame_idx=idx)
-
-    # --- SLOW MOTION REPLAY ---
-    def _update_play_pause_button(self):
-        if self.replay_playing:
-            self.btn_play_pause.setText(" Pause")
-            self.btn_play_pause.setIcon(svg_icon("pause", color=COLORS.TEXT_PRIMARY, size=15))
-        else:
-            self.btn_play_pause.setText(" Play")
-            self.btn_play_pause.setIcon(svg_icon("play", color=COLORS.TEXT_PRIMARY, size=15))
-
-    def _on_speed_changed(self):
-        self.replay_speed = float(self.combo_speed.currentData())
-        if self.replay_playing:
-            self._start_replay_timer()
-
-    def _start_replay_timer(self):
-        base_fps = self.analysis_result.fps if self.analysis_result else 30.0
-        interval_ms = max(15, int(1000.0 / (base_fps * self.replay_speed)))
-        self.replay_timer.start(interval_ms)
-
-    def _toggle_replay_play(self):
-        if not self.analysis_result:
-            return
-        self.replay_playing = not self.replay_playing
-        self._update_play_pause_button()
-        if self.replay_playing:
-            if self.replay_frame_idx >= self.analysis_result.total_frames - 1:
-                self.replay_frame_idx = 0
-            self._start_replay_timer()
-        else:
-            self.replay_timer.stop()
-
-    def _on_replay_tick(self):
-        if not self.analysis_result:
-            return
-        self.replay_frame_idx += 1
-        if self.replay_frame_idx >= self.analysis_result.total_frames:
-            self.replay_frame_idx = 0
-        self.replay_slider.blockSignals(True)
-        self.replay_slider.setValue(self.replay_frame_idx)
-        self.replay_slider.blockSignals(False)
-        self._render_replay_frame(self.replay_frame_idx)
-
-    def _on_replay_slider_moved(self, val: int):
-        self.replay_frame_idx = val
-        if self.result_controls_stack.currentIndex() == 1:
-            self._render_replay_frame(val)
-
-    def _render_replay_frame(self, idx: int):
-        if not self.analysis_result:
+    def _populate_result_carousel(self):
+        if self.state != self.STATE_RESULT or not self.analysis_result:
             return
         res = self.analysis_result
-        idx = max(0, min(idx, res.total_frames - 1))
 
-        raw_frame = self.raw_recorded_frames[idx]
-        lm = res.landmarks_per_frame[idx]
-        angle = res.arm_angles_per_frame[idx]
-        handedness = self.combo_handedness.currentData()
-        h, w, _ = raw_frame.shape
+        self.lbl_mode_pill.setVisible(False)
+        self.lbl_view_pill.setVisible(True)
+        self.lbl_score_pill.setVisible(True)
+        self.lbl_view_pill.setText(
+            "Face-On View" if res.camera_view == "face_on" else "Down-the-Line (DTL)"
+        )
+        self.lbl_score_pill.setText(f"Passed {res.score_passed}/{res.score_evaluated}")
 
-        if self.chk_mirror.isChecked():
-            disp_frame = cv2.flip(raw_frame, 1)
-            disp_lm = mirror_landmarks(lm, w)
-            disp_hand = "left" if handedness == "right" else "right"
+        errors = [c for c in res.criteria if c.status == "error"]
+        if errors:
+            noun = "Fault" if len(errors) == 1 else "Faults"
+            self.lbl_summary_pill.setText(
+                f"{len(errors)} {noun} Detected  ·  Auto-cycling every {config.SLIDE_HOLD_SECONDS:.0f}s"
+            )
+            self.lbl_summary_pill.setStyleSheet(
+                f"color: {COLORS.CRIMSON_TEXT}; font-size: 14px; font-weight: 800;"
+            )
         else:
-            disp_frame = raw_frame
-            disp_lm = lm
-            disp_hand = handedness
+            self.lbl_summary_pill.setText(
+                f"Clean Swing! Passed {res.score_passed}/{res.score_evaluated}  ·  Auto-cycling every {config.SLIDE_HOLD_SECONDS:.0f}s"
+            )
+            self.lbl_summary_pill.setStyleSheet(
+                f"color: {COLORS.EMERALD_TEXT}; font-size: 14px; font-weight: 800;"
+            )
 
-        drawn = draw_skeleton_overlay(disp_frame, disp_lm, arm_angle=angle, handedness=disp_hand)
-        pix = bgr_to_pixmap(drawn)
-        if not self.result_viewer.size().isEmpty():
-            pix = pix.scaled(self.result_viewer.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation)
-        self.result_viewer.setPixmap(round_pixmap(pix, radius=16))
-        self.lbl_replay_time.setText(f"{idx + 1:03d} / {res.total_frames:03d}")
+        slides = [(self._render_criterion_image(crit), crit) for crit in res.criteria]
+        self._rebuild_pagination_dots(len(slides))
+        self.carousel.set_slides(slides)
+
+    def _rebuild_pagination_dots(self, count: int):
+        while self.dots_container.count():
+            item = self.dots_container.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+        self._dot_labels.clear()
+
+        for _ in range(count):
+            dot = QLabel()
+            dot.setFixedSize(10, 10)
+            dot.setStyleSheet(f"background-color: {COLORS.BORDER_MEDIUM}; border-radius: 5px;")
+            self._dot_labels.append(dot)
+            self.dots_container.addWidget(dot)
+
+    def _on_carousel_slide_changed(self, current: int, _total: int):
+        for i, dot in enumerate(self._dot_labels):
+            if i == current:
+                dot.setFixedSize(26, 10)
+                dot.setStyleSheet(f"background-color: {COLORS.EMERALD}; border-radius: 5px;")
+            else:
+                dot.setFixedSize(10, 10)
+                dot.setStyleSheet(f"background-color: {COLORS.BORDER_MEDIUM}; border-radius: 5px;")
+
+    def _on_carousel_hold_progress(self, pct: int):
+        self.slide_timer_bar.setValue(pct)
 
     def _restart_to_live(self):
-        self.replay_timer.stop()
-        self.replay_playing = False
+        self.carousel.stop()
         self.raw_recorded_frames.clear()
         self.raw_recorded_timestamps.clear()
         self.analysis_result = None
-        self.selected_criterion = None
         self.state = self.STATE_LIVE
         self._reset_live_controls()
         self.stacked.setCurrentIndex(0)
 
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
-        if self.state == self.STATE_RESULT:
-            if self.result_controls_stack.currentIndex() == 0:
-                self._render_selected_snapshot()
-            else:
-                self._render_replay_frame(self.replay_frame_idx)
-
     def closeEvent(self, event):
         self.countdown_timer.stop()
-        self.replay_timer.stop()
+        self._notice_reset_timer.stop()
+        self.carousel.stop()
         if hasattr(self, "cam_worker"):
             self.cam_worker.stop()
         super().closeEvent(event)
