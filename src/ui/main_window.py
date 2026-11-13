@@ -1,9 +1,8 @@
 """
-MAIN DESKTOP UI - VAR GOLF STUDIO (ULTRA-MINIMAL BORDERLESS KIOSK UI)
-Designed for 1-screen mouse-free / touch-free golf bays:
-- Borderless fullscreen (no window chrome or mouse-only clutter)
+MAIN DESKTOP UI - VAR GOLF STUDIO (FULL-BLEED BORDERLESS KIOSK UI)
+- Zero top bar, zero window frame/borders: 100% full-bleed camera viewport
 - Controlled by 1 physical button / foot pedal ([SPACE])
-- Horizontal auto-sliding diagnostic carousel (4.0s hold per slide + smooth slide transition)
+- Horizontal auto-sliding diagnostic carousel (4.0s hold per slide)
 """
 
 import copy
@@ -37,6 +36,7 @@ from PySide6.QtGui import (
 )
 from PySide6.QtWidgets import (
     QFrame,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
     QMainWindow,
@@ -152,7 +152,7 @@ def bgr_to_pixmap(frame_bgr: np.ndarray) -> QPixmap:
 
 
 def round_pixmap(pix: QPixmap, radius: int = 16) -> QPixmap:
-    """Clip all 4 corners of a Video/Snapshot QPixmap cleanly."""
+    """Clip all 4 corners of a Snapshot QPixmap cleanly."""
     if pix.isNull():
         return pix
     rounded = QPixmap(pix.size())
@@ -226,21 +226,21 @@ class SwingSlideWidget(QFrame):
     def _build_ui(self, slide_index: int, total_slides: int):
         c = COLORS
         root = QHBoxLayout(self)
-        root.setContentsMargins(16, 16, 20, 16)
-        root.setSpacing(22)
+        root.setContentsMargins(16, 16, 22, 16)
+        root.setSpacing(24)
 
-        # Left: Circled Fault Image
+        # Left: Circled Fault Snapshot
         self.img_label = QLabel()
         self.img_label.setAlignment(Qt.AlignCenter)
         self.img_label.setStyleSheet(f"background-color: {c.BG_SUBTLE}; border-radius: 16px;")
         self.img_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.img_label.setMinimumSize(320, 260)
-        root.addWidget(self.img_label, stretch=63)
+        root.addWidget(self.img_label, stretch=64)
 
         # Right: Large Readable Coaching Card
         text_col = QVBoxLayout()
-        text_col.setContentsMargins(4, 8, 4, 8)
-        text_col.setSpacing(14)
+        text_col.setContentsMargins(4, 10, 4, 10)
+        text_col.setSpacing(15)
 
         if self.criterion.status == "error":
             accent, pill_bg, pill_fg = c.CRIMSON, "#FEE2E2", c.CRIMSON_TEXT
@@ -290,7 +290,7 @@ class SwingSlideWidget(QFrame):
         title = QLabel(self.criterion.title)
         title.setWordWrap(True)
         title.setStyleSheet(
-            f"color: {c.TEXT_PRIMARY}; font-size: 23px; font-weight: 800; "
+            f"color: {c.TEXT_PRIMARY}; font-size: 24px; font-weight: 800; "
             "line-height: 1.2; background: transparent; border: none;"
         )
         text_col.addWidget(title)
@@ -301,7 +301,7 @@ class SwingSlideWidget(QFrame):
             f"background-color: {c.BG_SUBTLE}; border: 1px solid {c.BORDER_LIGHT}; border-radius: 14px;"
         )
         mb_layout = QHBoxLayout(metric_box)
-        mb_layout.setContentsMargins(14, 12, 14, 12)
+        mb_layout.setContentsMargins(16, 12, 16, 12)
         mb_layout.setSpacing(16)
 
         measured_col = QVBoxLayout()
@@ -309,7 +309,7 @@ class SwingSlideWidget(QFrame):
         m_hdr = QLabel("MEASURED")
         m_hdr.setStyleSheet(f"color: {c.TEXT_MUTED}; font-size: 10px; font-weight: 800; letter-spacing: 0.7px; border: none;")
         m_val = QLabel(self.criterion.measured_text)
-        m_val.setStyleSheet(f"color: {accent}; font-family: {FONT_MONO}; font-size: 16px; font-weight: 800; border: none;")
+        m_val.setStyleSheet(f"color: {accent}; font-family: {FONT_MONO}; font-size: 17px; font-weight: 800; border: none;")
         measured_col.addWidget(m_hdr)
         measured_col.addWidget(m_val)
 
@@ -318,7 +318,7 @@ class SwingSlideWidget(QFrame):
         t_hdr = QLabel("PGA TARGET")
         t_hdr.setStyleSheet(f"color: {c.TEXT_MUTED}; font-size: 10px; font-weight: 800; letter-spacing: 0.7px; border: none;")
         t_val = QLabel(self.criterion.standard_text)
-        t_val.setStyleSheet(f"color: {c.TEXT_PRIMARY}; font-family: {FONT_MONO}; font-size: 16px; font-weight: 800; border: none;")
+        t_val.setStyleSheet(f"color: {c.TEXT_PRIMARY}; font-family: {FONT_MONO}; font-size: 17px; font-weight: 800; border: none;")
         target_col.addWidget(t_hdr)
         target_col.addWidget(t_val)
 
@@ -330,12 +330,12 @@ class SwingSlideWidget(QFrame):
         desc = QLabel(self.criterion.description)
         desc.setWordWrap(True)
         desc.setStyleSheet(
-            f"color: {c.TEXT_SECONDARY}; font-size: 15px; font-weight: 500; "
+            f"color: {c.TEXT_SECONDARY}; font-size: 16px; font-weight: 500; "
             "line-height: 1.45; background: transparent; border: none;"
         )
         text_col.addWidget(desc)
 
-        # Actionable Fix / Note Card
+        # Coaching Tip Card
         if self.criterion.correction_tip:
             is_err = self.criterion.status == "error"
             tip_bg = c.AMBER_SOFT if is_err else c.EMERALD_SOFT
@@ -360,7 +360,7 @@ class SwingSlideWidget(QFrame):
             tip = QLabel(self.criterion.correction_tip)
             tip.setWordWrap(True)
             tip.setStyleSheet(
-                f"color: {tip_fg}; font-size: 14px; font-weight: 700; "
+                f"color: {tip_fg}; font-size: 15px; font-weight: 700; "
                 "line-height: 1.35; background: transparent; border: none;"
             )
             tip_row.addWidget(bulb_lbl)
@@ -368,7 +368,7 @@ class SwingSlideWidget(QFrame):
             text_col.addWidget(tip_box)
 
         text_col.addStretch()
-        root.addLayout(text_col, stretch=37)
+        root.addLayout(text_col, stretch=36)
 
     def refresh_image(self):
         if self._source_pixmap.isNull() or self.img_label.size().isEmpty():
@@ -389,8 +389,8 @@ class SwingSlideWidget(QFrame):
 class HorizontalCarouselWidget(QWidget):
     """Auto-sliding horizontal carousel holding each slide for config.SLIDE_HOLD_SECONDS."""
 
-    slide_changed = Signal(int, int)       # (current_index, total_slides)
-    hold_progress = Signal(int)            # 0..100
+    slide_changed = Signal(int, int)
+    hold_progress = Signal(int)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -525,12 +525,12 @@ class GolfAssistantWindow(QMainWindow):
         self.camera_index = camera_index
         self.state = self.STATE_LIVE
 
-        # Headless/Kiosk configuration (toggled via keyboard if ever needed)
+        # Kiosk config (toggled via keyboard if needed)
         self.handedness = config.GOLFER_HANDEDNESS
         self.mirror_enabled = config.MIRROR_CAMERA_DEFAULT
         self.record_duration_sec = config.RECORD_SECONDS
 
-        # Session state
+        # Session data
         self.raw_recorded_frames: list[np.ndarray] = []
         self.raw_recorded_timestamps: list[float] = []
         self.analysis_result: SwingAnalysisResult | None = None
@@ -543,74 +543,63 @@ class GolfAssistantWindow(QMainWindow):
         self._start_camera()
 
     def _init_ui(self):
-        self.setWindowTitle("VAR Golf Studio - AI Golf Swing Analyzer")
+        self.setWindowTitle("VAR Golf Studio")
         self.setWindowFlags(Qt.Window | Qt.FramelessWindowHint)
         self.resize(1366, 768)
         self.setStyleSheet(build_app_stylesheet())
 
-        central = QWidget()
-        central.setObjectName("RootCanvas")
-        self.setCentralWidget(central)
-        root_layout = QVBoxLayout(central)
-        root_layout.setContentsMargins(14, 12, 14, 14)
-        root_layout.setSpacing(12)
-
-        root_layout.addWidget(self._build_top_bar())
-
+        # Zero outer window margins — edge-to-edge full screen
         self.stacked = QStackedWidget()
+        self.stacked.setContentsMargins(0, 0, 0, 0)
         self.stacked.addWidget(self._build_live_page())
         self.stacked.addWidget(self._build_result_page())
-        root_layout.addWidget(self.stacked, stretch=1)
+        self.setCentralWidget(self.stacked)
 
-    def _build_top_bar(self) -> QFrame:
-        bar = QFrame()
-        bar.setObjectName("TopBar")
-        bar.setFixedHeight(60)
-        apply_soft_shadow(bar, blur=20, y_offset=4, alpha=15)
+    def _build_live_page(self) -> QWidget:
+        page = QWidget()
+        grid = QGridLayout(page)
+        grid.setContentsMargins(0, 0, 0, 0)
+        grid.setSpacing(0)
 
-        layout = QHBoxLayout(bar)
-        layout.setContentsMargins(16, 8, 14, 8)
-        layout.setSpacing(12)
+        # Layer 0: Full-bleed edge-to-edge Camera Feed
+        self.live_viewer = QLabel("Initializing Camera Feed...")
+        self.live_viewer.setAlignment(Qt.AlignCenter)
+        self.live_viewer.setStyleSheet(
+            f"background-color: {COLORS.BG_CANVAS}; color: {COLORS.TEXT_MUTED}; "
+            "font-size: 18px; font-weight: 600;"
+        )
+        self.live_viewer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        grid.addWidget(self.live_viewer, 0, 0)
 
-        icon_box = QFrame()
-        icon_box.setObjectName("BrandIconBox")
-        icon_box.setFixedSize(38, 38)
-        ib_layout = QHBoxLayout(icon_box)
-        ib_layout.setContentsMargins(0, 0, 0, 0)
-        ib_layout.setAlignment(Qt.AlignCenter)
+        # Layer 1: Minimal Floating Glass HUD Overlay
+        hud = QWidget()
+        hud.setAttribute(Qt.WA_TranslucentBackground)
+        hud_layout = QVBoxLayout(hud)
+        hud_layout.setContentsMargins(20, 18, 20, 22)
+        hud_layout.setSpacing(12)
+
+        # Top-left floating status pill + Top-right exit button (no full bar)
+        top_row = QHBoxLayout()
+        status_pill = QFrame()
+        status_pill.setObjectName("FloatingPill")
+        apply_soft_shadow(status_pill, blur=16, y_offset=3, alpha=22)
+        sp_layout = QHBoxLayout(status_pill)
+        sp_layout.setContentsMargins(10, 6, 14, 6)
+        sp_layout.setSpacing(8)
+
         logo_lbl = QLabel()
-        logo_lbl.setPixmap(svg_pixmap("target", color=COLORS.EMERALD, size=21, stroke_width=2.2))
-        logo_lbl.setStyleSheet("background: transparent; border: none;")
-        ib_layout.addWidget(logo_lbl)
-
-        brand_col = QVBoxLayout()
-        brand_col.setSpacing(0)
-        title = QLabel("VAR Golf Studio")
-        title.setObjectName("BrandTitle")
-        subtitle = QLabel("2D + 3D PGA / TPI Biomechanics")
-        subtitle.setObjectName("BrandSubtitle")
-        brand_col.addWidget(title)
-        brand_col.addWidget(subtitle)
+        logo_lbl.setPixmap(svg_pixmap("target", color=COLORS.EMERALD, size=18, stroke_width=2.2))
+        logo_lbl.setStyleSheet("background: transparent;")
 
         self.lbl_status_pill = QLabel("Ready")
         self._set_status_pill("Ready", COLORS.EMERALD_TEXT, COLORS.EMERALD_SOFT, COLORS.EMERALD_BORDER)
 
-        layout.addWidget(icon_box)
-        layout.addLayout(brand_col)
-        layout.addSpacing(8)
-        layout.addWidget(self.lbl_status_pill)
-        layout.addStretch()
-
-        self.lbl_view_pill = QLabel("")
-        self.lbl_view_pill.setObjectName("MetaPill")
-        self.lbl_view_pill.setVisible(False)
-
-        self.lbl_score_pill = QLabel("")
-        self.lbl_score_pill.setObjectName("ScorePill")
-        self.lbl_score_pill.setVisible(False)
-
         self.lbl_mode_pill = QLabel("Right-Handed  ·  10s")
-        self.lbl_mode_pill.setObjectName("MetaPill")
+        self.lbl_mode_pill.setObjectName("FloatingMeta")
+
+        sp_layout.addWidget(logo_lbl)
+        sp_layout.addWidget(self.lbl_status_pill)
+        sp_layout.addWidget(self.lbl_mode_pill)
 
         self.btn_exit = QPushButton()
         self.btn_exit.setObjectName("ExitBtn")
@@ -620,60 +609,52 @@ class GolfAssistantWindow(QMainWindow):
         self.btn_exit.setCursor(Qt.PointingHandCursor)
         self.btn_exit.clicked.connect(self.close)
 
-        layout.addWidget(self.lbl_view_pill)
-        layout.addWidget(self.lbl_score_pill)
-        layout.addWidget(self.lbl_mode_pill)
-        layout.addWidget(self.btn_exit)
-        return bar
+        top_row.addWidget(status_pill)
+        top_row.addStretch()
+        top_row.addWidget(self.btn_exit)
+        hud_layout.addLayout(top_row)
 
-    def _build_live_page(self) -> QWidget:
-        page = QWidget()
-        layout = QVBoxLayout(page)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(12)
+        hud_layout.addStretch(1)
 
-        stage = QFrame()
-        stage.setObjectName("StageCard")
-        apply_soft_shadow(stage, blur=26, y_offset=6, alpha=16)
-        stage_layout = QVBoxLayout(stage)
-        stage_layout.setContentsMargins(10, 10, 10, 10)
+        # Center Analyzing Card (shown only while processing)
+        self.analyze_modal = QFrame()
+        self.analyze_modal.setObjectName("AnalyzeModal")
+        self.analyze_modal.setFixedWidth(480)
+        self.analyze_modal.setVisible(False)
+        apply_soft_shadow(self.analyze_modal, blur=28, y_offset=8, alpha=30)
+        am_layout = QVBoxLayout(self.analyze_modal)
+        am_layout.setContentsMargins(24, 22, 24, 22)
+        am_layout.setSpacing(12)
 
-        self.live_viewer = QLabel("Initializing Camera Feed...")
-        self.live_viewer.setAlignment(Qt.AlignCenter)
-        self.live_viewer.setStyleSheet(
-            f"background-color: {COLORS.BG_SUBTLE}; border-radius: 16px; "
-            f"border: 1px dashed {COLORS.BORDER_MEDIUM}; "
-            f"color: {COLORS.TEXT_MUTED}; font-size: 16px; font-weight: 600;"
+        self.lbl_analyze_title = QLabel("Analyzing 2D + 3D Swing Biomechanics...")
+        self.lbl_analyze_title.setAlignment(Qt.AlignCenter)
+        self.lbl_analyze_title.setStyleSheet(
+            f"color: {COLORS.TEXT_PRIMARY}; font-size: 16px; font-weight: 800; background: transparent;"
         )
-        self.live_viewer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.live_viewer.setMinimumHeight(440)
-        stage_layout.addWidget(self.live_viewer)
-        layout.addWidget(stage, stretch=1)
-
-        dock = QFrame()
-        dock.setObjectName("ControlDock")
-        apply_soft_shadow(dock, blur=20, y_offset=4, alpha=14)
-        dock_layout = QHBoxLayout(dock)
-        dock_layout.setContentsMargins(22, 12, 22, 12)
-        dock_layout.setSpacing(16)
-
-        left_info = QVBoxLayout()
-        left_info.setSpacing(6)
-        self.lbl_live_status = QLabel(
-            "Press [SPACE] or Foot Pedal to start 5s countdown, then swing naturally."
-        )
-        self.lbl_live_status.setObjectName("LiveHintLabel")
-        self.lbl_live_status.setWordWrap(True)
-
         self.progress_bar = QProgressBar()
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(0)
-        self.progress_bar.setVisible(False)
-        self.progress_bar.setFixedWidth(440)
+        am_layout.addWidget(self.lbl_analyze_title)
+        am_layout.addWidget(self.progress_bar)
 
-        left_info.addWidget(self.lbl_live_status)
-        left_info.addWidget(self.progress_bar)
-        dock_layout.addLayout(left_info, stretch=1)
+        center_row = QHBoxLayout()
+        center_row.addStretch()
+        center_row.addWidget(self.analyze_modal)
+        center_row.addStretch()
+        hud_layout.addLayout(center_row)
+
+        hud_layout.addStretch(1)
+
+        # Bottom-center Floating Action Pill
+        self.bottom_pill = QFrame()
+        self.bottom_pill.setObjectName("FloatingPill")
+        apply_soft_shadow(self.bottom_pill, blur=20, y_offset=4, alpha=24)
+        bp_layout = QHBoxLayout(self.bottom_pill)
+        bp_layout.setContentsMargins(18, 10, 12, 10)
+        bp_layout.setSpacing(14)
+
+        self.lbl_live_status = QLabel("Press [SPACE] or Foot Pedal to start 5s countdown")
+        self.lbl_live_status.setObjectName("LiveHintLabel")
 
         self.btn_start = QPushButton(" Start Recording [SPACE]")
         self.btn_start.setObjectName("PrimaryCTA")
@@ -698,16 +679,25 @@ class GolfAssistantWindow(QMainWindow):
         self.btn_cancel.setVisible(False)
         self.btn_cancel.clicked.connect(self._on_cancel_clicked)
 
-        dock_layout.addWidget(self.btn_cancel)
-        dock_layout.addWidget(self.btn_stop_early)
-        dock_layout.addWidget(self.btn_start)
-        layout.addWidget(dock)
+        bp_layout.addWidget(self.lbl_live_status)
+        bp_layout.addWidget(self.btn_cancel)
+        bp_layout.addWidget(self.btn_stop_early)
+        bp_layout.addWidget(self.btn_start)
+
+        bottom_row = QHBoxLayout()
+        bottom_row.addStretch()
+        bottom_row.addWidget(self.bottom_pill)
+        bottom_row.addStretch()
+        hud_layout.addLayout(bottom_row)
+
+        grid.addWidget(hud, 0, 0)
         return page
 
     def _build_result_page(self) -> QWidget:
         page = QWidget()
+        page.setObjectName("RootCanvas")
         layout = QVBoxLayout(page)
-        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setContentsMargins(14, 14, 14, 14)
         layout.setSpacing(12)
 
         # Horizontal Sliding Carousel Stage
@@ -716,7 +706,7 @@ class GolfAssistantWindow(QMainWindow):
         self.carousel.hold_progress.connect(self._on_carousel_hold_progress)
         layout.addWidget(self.carousel, stretch=1)
 
-        # Minimal Bottom Footer: Timer Progress + Dots + Next Swing Prompt
+        # Minimal Bottom Footer
         footer = QFrame()
         footer.setObjectName("ControlDock")
         apply_soft_shadow(footer, blur=20, y_offset=4, alpha=14)
@@ -736,8 +726,14 @@ class GolfAssistantWindow(QMainWindow):
 
         self.lbl_summary_pill = QLabel("Swing Report")
         self.lbl_summary_pill.setStyleSheet(
-            f"color: {COLORS.TEXT_PRIMARY}; font-size: 14px; font-weight: 700;"
+            f"color: {COLORS.TEXT_PRIMARY}; font-size: 14px; font-weight: 800;"
         )
+
+        self.lbl_view_pill = QLabel("")
+        self.lbl_view_pill.setObjectName("MetaPill")
+
+        self.lbl_score_pill = QLabel("")
+        self.lbl_score_pill.setObjectName("ScorePill")
 
         self.dots_container = QHBoxLayout()
         self.dots_container.setSpacing(6)
@@ -749,11 +745,22 @@ class GolfAssistantWindow(QMainWindow):
         self.btn_retry.setCursor(Qt.PointingHandCursor)
         self.btn_retry.clicked.connect(self._restart_to_live)
 
+        self.btn_result_exit = QPushButton()
+        self.btn_result_exit.setObjectName("ExitBtn")
+        self.btn_result_exit.setIcon(svg_icon("x_close", color=COLORS.TEXT_MUTED, size=16))
+        self.btn_result_exit.setIconSize(QSize(16, 16))
+        self.btn_result_exit.setToolTip("Exit [Ctrl+Q]")
+        self.btn_result_exit.setCursor(Qt.PointingHandCursor)
+        self.btn_result_exit.clicked.connect(self.close)
+
         row.addWidget(self.lbl_summary_pill)
-        row.addSpacing(12)
+        row.addWidget(self.lbl_view_pill)
+        row.addWidget(self.lbl_score_pill)
+        row.addSpacing(8)
         row.addLayout(self.dots_container)
         row.addStretch()
         row.addWidget(self.btn_retry)
+        row.addWidget(self.btn_result_exit)
         footer_col.addLayout(row)
 
         layout.addWidget(footer)
@@ -815,7 +822,7 @@ class GolfAssistantWindow(QMainWindow):
         self.lbl_status_pill.setText(text)
         self.lbl_status_pill.setStyleSheet(
             f"background-color: {bg}; color: {fg}; border: 1px solid {border}; "
-            "border-radius: 13px; padding: 4px 12px; font-size: 11px; font-weight: 700;"
+            "border-radius: 11px; padding: 3px 10px; font-size: 11px; font-weight: 800;"
         )
 
     # --- CAMERA & LIVE LOOP ---
@@ -828,9 +835,8 @@ class GolfAssistantWindow(QMainWindow):
     def _on_camera_error(self, msg: str):
         self.live_viewer.setText(f"Camera Offline\n\n{msg}")
         self.live_viewer.setStyleSheet(
-            f"background-color: {COLORS.CRIMSON_SOFT}; border-radius: 16px; "
-            f"border: 1px dashed {COLORS.CRIMSON_BORDER}; "
-            f"color: {COLORS.CRIMSON_TEXT}; font-size: 15px; font-weight: 600;"
+            f"background-color: {COLORS.CRIMSON_SOFT}; color: {COLORS.CRIMSON_TEXT}; "
+            "font-size: 16px; font-weight: 600;"
         )
         self.btn_start.setEnabled(False)
         self._set_status_pill("Camera Offline", COLORS.CRIMSON_TEXT, COLORS.CRIMSON_SOFT, COLORS.CRIMSON_BORDER)
@@ -845,50 +851,36 @@ class GolfAssistantWindow(QMainWindow):
 
             elapsed = time.perf_counter() - self.record_start_time
             remaining = max(0.0, self.record_duration_sec - elapsed)
-            self.lbl_live_status.setText(
-                f"Recording Golf Swing... {remaining:.1f}s left (Press SPACE to analyze early)"
-            )
+            self.lbl_live_status.setText(f"Recording Golf Swing... {remaining:.1f}s left")
             if elapsed >= self.record_duration_sec:
                 self._finish_recording_and_analyze()
                 return
 
-        if not getattr(self, "_live_has_video", False):
-            self._live_has_video = True
-            self.live_viewer.setStyleSheet("background-color: transparent; border: none; border-radius: 16px;")
-
         disp = cv2.flip(frame_bgr, 1) if self.mirror_enabled else frame_bgr
         pix = bgr_to_pixmap(disp)
-        if not self.live_viewer.size().isEmpty():
-            pix = pix.scaled(self.live_viewer.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        target_sz = self.live_viewer.size()
+        if not target_sz.isEmpty():
+            # Full-bleed edge-to-edge fill with center crop if aspect ratio differs
+            pix = pix.scaled(target_sz, Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation)
+            if pix.width() > target_sz.width() or pix.height() > target_sz.height():
+                x_off = max(0, (pix.width() - target_sz.width()) // 2)
+                y_off = max(0, (pix.height() - target_sz.height()) // 2)
+                pix = pix.copy(x_off, y_off, target_sz.width(), target_sz.height())
 
         pix = self._paint_live_hud(pix)
-        self.live_viewer.setPixmap(round_pixmap(pix, radius=16))
+        self.live_viewer.setPixmap(pix)
 
     def _paint_live_hud(self, pix: QPixmap) -> QPixmap:
         painter = QPainter(pix)
         painter.setRenderHint(QPainter.Antialiasing, True)
         w, h = pix.width(), pix.height()
 
-        if self.state in (self.STATE_LIVE, self.STATE_COUNTDOWN, self.STATE_RECORDING):
-            bracket_color = QColor("#10B981" if self.state == self.STATE_RECORDING else "#FFFFFF")
-            bracket_color.setAlpha(200 if self.state == self.STATE_RECORDING else 135)
-            painter.setPen(QPen(bracket_color, 2.5, Qt.SolidLine, Qt.RoundCap))
-            pad, arm = 20, 24
-            painter.drawLine(pad, pad, pad + arm, pad)
-            painter.drawLine(pad, pad, pad, pad + arm)
-            painter.drawLine(w - pad, pad, w - pad - arm, pad)
-            painter.drawLine(w - pad, pad, w - pad, pad + arm)
-            painter.drawLine(pad, h - pad, pad + arm, h - pad)
-            painter.drawLine(pad, h - pad, pad, h - pad - arm)
-            painter.drawLine(w - pad, h - pad, w - pad - arm, h - pad)
-            painter.drawLine(w - pad, h - pad, w - pad, h - pad - arm)
-
         if self.state == self.STATE_COUNTDOWN:
-            painter.fillRect(0, 0, w, h, QColor(15, 23, 42, 115))
+            painter.fillRect(0, 0, w, h, QColor(15, 23, 42, 110))
 
             cx, cy = w // 2, h // 2 - 14
-            r = 68
-            painter.setBrush(QColor(255, 255, 255, 235))
+            r = 74
+            painter.setBrush(QColor(255, 255, 255, 238))
             painter.setPen(Qt.NoPen)
             painter.drawEllipse(cx - r, cy - r, r * 2, r * 2)
 
@@ -907,17 +899,17 @@ class GolfAssistantWindow(QMainWindow):
             )
 
             painter.setPen(QColor(COLORS.TEXT_PRIMARY))
-            painter.setFont(QFont("Consolas", 56, QFont.Bold))
-            painter.drawText(cx - 55, cy - 48, 110, 96, Qt.AlignCenter, str(self.countdown_remaining))
+            painter.setFont(QFont("Consolas", 60, QFont.Bold))
+            painter.drawText(cx - 55, cy - 50, 110, 100, Qt.AlignCenter, str(self.countdown_remaining))
 
-            painter.setBrush(QColor(255, 255, 255, 235))
+            painter.setBrush(QColor(255, 255, 255, 238))
             painter.setPen(Qt.NoPen)
             pill_w = min(360, w - 40)
-            painter.drawRoundedRect((w - pill_w) // 2, cy + 84, pill_w, 38, 19, 19)
+            painter.drawRoundedRect((w - pill_w) // 2, cy + 92, pill_w, 40, 20, 20)
             painter.setPen(QColor(COLORS.TEXT_PRIMARY))
             painter.setFont(QFont("Segoe UI", 12, QFont.Bold))
             painter.drawText(
-                (w - pill_w) // 2, cy + 84, pill_w, 38, Qt.AlignCenter, "GET INTO ADDRESS POSTURE"
+                (w - pill_w) // 2, cy + 92, pill_w, 40, Qt.AlignCenter, "GET INTO ADDRESS POSTURE"
             )
 
         elif self.state == self.STATE_RECORDING:
@@ -925,23 +917,27 @@ class GolfAssistantWindow(QMainWindow):
             remaining = max(0.0, self.record_duration_sec - elapsed)
             ratio = min(1.0, elapsed / max(0.1, float(self.record_duration_sec)))
 
+            # REC Pill top-center
+            pill_w = 176
+            rx = (w - pill_w) // 2
             painter.setBrush(QColor(255, 255, 255, 235))
             painter.setPen(QPen(QColor(COLORS.CRIMSON_BORDER), 1.5))
-            painter.drawRoundedRect(26, 26, 172, 36, 18, 18)
+            painter.drawRoundedRect(rx, 20, pill_w, 36, 18, 18)
 
             painter.setBrush(QColor(COLORS.CRIMSON))
             painter.setPen(Qt.NoPen)
-            painter.drawEllipse(39, 38, 12, 12)
+            painter.drawEllipse(rx + 14, 32, 12, 12)
 
             painter.setPen(QColor(COLORS.TEXT_PRIMARY))
             painter.setFont(QFont("Consolas", 13, QFont.Bold))
-            painter.drawText(58, 26, 134, 36, Qt.AlignVCenter | Qt.AlignLeft, f"REC  {remaining:04.1f}s")
+            painter.drawText(rx + 34, 20, 134, 36, Qt.AlignVCenter | Qt.AlignLeft, f"REC  {remaining:04.1f}s")
 
-            bar_w = int((w - 52) * ratio)
-            painter.setBrush(QColor(255, 255, 255, 160))
-            painter.drawRoundedRect(26, h - 22, w - 52, 6, 3, 3)
+            # Edge-to-edge thin bottom recording bar
+            bar_w = int(w * ratio)
+            painter.setBrush(QColor(255, 255, 255, 140))
+            painter.drawRect(0, h - 5, w, 5)
             painter.setBrush(QColor(COLORS.EMERALD_BRIGHT))
-            painter.drawRoundedRect(26, h - 22, max(10, bar_w), 6, 3, 3)
+            painter.drawRect(0, h - 5, max(8, bar_w), 5)
 
         painter.end()
         return pix
@@ -1001,32 +997,27 @@ class GolfAssistantWindow(QMainWindow):
             self._restart_to_live()
 
     def _reset_live_controls(self):
+        self.analyze_modal.setVisible(False)
+        self.bottom_pill.setVisible(True)
         self.btn_start.setVisible(True)
         self.btn_start.setEnabled(True)
         self.btn_cancel.setVisible(False)
         self.btn_stop_early.setVisible(False)
-        self.progress_bar.setVisible(False)
         self.progress_bar.setValue(0)
-        self.lbl_view_pill.setVisible(False)
-        self.lbl_score_pill.setVisible(False)
-        self.lbl_mode_pill.setVisible(True)
         self._set_status_pill("Ready", COLORS.EMERALD_TEXT, COLORS.EMERALD_SOFT, COLORS.EMERALD_BORDER)
-        self.lbl_live_status.setText(
-            "Press [SPACE] or Foot Pedal to start 5s countdown, then swing naturally."
-        )
+        self.lbl_live_status.setText("Press [SPACE] or Foot Pedal to start 5s countdown")
 
     def _finish_recording_and_analyze(self):
         if self.state != self.STATE_RECORDING:
             return
         self.state = self.STATE_ANALYZING
-        self.btn_stop_early.setVisible(False)
-        self.btn_cancel.setVisible(False)
-        self.progress_bar.setVisible(True)
+        self.bottom_pill.setVisible(False)
+        self.analyze_modal.setVisible(True)
         self.progress_bar.setValue(0)
-        self._set_status_pill("Analyzing", COLORS.BLUE_TEXT, COLORS.BLUE_SOFT, COLORS.BLUE_BORDER)
-        self.lbl_live_status.setText(
-            f"Running 2D + 3D biomechanics analysis ({len(self.raw_recorded_frames)} frames)..."
+        self.lbl_analyze_title.setText(
+            f"Analyzing 2D + 3D Biomechanics ({len(self.raw_recorded_frames)} frames)..."
         )
+        self._set_status_pill("Analyzing", COLORS.BLUE_TEXT, COLORS.BLUE_SOFT, COLORS.BLUE_BORDER)
 
         self.analysis_worker = AnalysisWorker(
             self.raw_recorded_frames, self.raw_recorded_timestamps, self.handedness
@@ -1047,7 +1038,7 @@ class GolfAssistantWindow(QMainWindow):
     def _on_analysis_failed(self, err: str):
         self._show_nonblocking_live_notice(
             "Analysis Retry",
-            f"Analysis interrupted ({err}). Press [SPACE] to record again.",
+            f"Analysis interrupted ({err}). Press [SPACE] to try again.",
         )
 
     def _on_analysis_finished(self, result: SwingAnalysisResult):
@@ -1055,12 +1046,11 @@ class GolfAssistantWindow(QMainWindow):
         if not result.person_detected or not result.criteria:
             self._show_nonblocking_live_notice(
                 "No Player Detected",
-                "Player was not clearly visible head-to-toe. Step back slightly and press [SPACE] to try again.",
+                "Player was not clearly visible head-to-toe. Step back slightly and press [SPACE].",
             )
             return
 
         self.state = self.STATE_RESULT
-        self._set_status_pill("Swing Report", COLORS.EMERALD_TEXT, COLORS.EMERALD_SOFT, COLORS.EMERALD_BORDER)
         self.stacked.setCurrentIndex(1)
         QTimer.singleShot(0, self._populate_result_carousel)
 
@@ -1102,9 +1092,6 @@ class GolfAssistantWindow(QMainWindow):
             return
         res = self.analysis_result
 
-        self.lbl_mode_pill.setVisible(False)
-        self.lbl_view_pill.setVisible(True)
-        self.lbl_score_pill.setVisible(True)
         self.lbl_view_pill.setText(
             "Face-On View" if res.camera_view == "face_on" else "Down-the-Line (DTL)"
         )
@@ -1113,18 +1100,14 @@ class GolfAssistantWindow(QMainWindow):
         errors = [c for c in res.criteria if c.status == "error"]
         if errors:
             noun = "Fault" if len(errors) == 1 else "Faults"
-            self.lbl_summary_pill.setText(
-                f"{len(errors)} {noun} Detected  ·  Auto-cycling every {config.SLIDE_HOLD_SECONDS:.0f}s"
-            )
+            self.lbl_summary_pill.setText(f"{len(errors)} {noun} Detected")
             self.lbl_summary_pill.setStyleSheet(
-                f"color: {COLORS.CRIMSON_TEXT}; font-size: 14px; font-weight: 800;"
+                f"color: {COLORS.CRIMSON_TEXT}; font-size: 15px; font-weight: 800;"
             )
         else:
-            self.lbl_summary_pill.setText(
-                f"Clean Swing! Passed {res.score_passed}/{res.score_evaluated}  ·  Auto-cycling every {config.SLIDE_HOLD_SECONDS:.0f}s"
-            )
+            self.lbl_summary_pill.setText("Clean Swing!")
             self.lbl_summary_pill.setStyleSheet(
-                f"color: {COLORS.EMERALD_TEXT}; font-size: 14px; font-weight: 800;"
+                f"color: {COLORS.EMERALD_TEXT}; font-size: 15px; font-weight: 800;"
             )
 
         slides = [(self._render_criterion_image(crit), crit) for crit in res.criteria]

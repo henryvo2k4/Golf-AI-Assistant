@@ -78,7 +78,25 @@ def build_app_stylesheet() -> str:
         font-family: {FONT_UI};
     }}
 
-    /* === MINIMAL TOP BAR === */
+    /* === FLOATING GLASS PILLS OVER FULL-BLEED CAMERA === */
+    QFrame#FloatingPill {{
+        background-color: rgba(255, 255, 255, 235);
+        border: 1px solid rgba(226, 232, 240, 230);
+        border-radius: 18px;
+    }}
+    QFrame#AnalyzeModal {{
+        background-color: rgba(255, 255, 255, 244);
+        border: 1px solid {c.BORDER_LIGHT};
+        border-radius: 22px;
+    }}
+    QLabel#FloatingMeta {{
+        color: {c.TEXT_SECONDARY};
+        font-size: 13px;
+        font-weight: 700;
+        background: transparent;
+    }}
+
+    /* === MINIMAL BADGES === */
     QFrame#TopBar {{
         background-color: {c.BG_CARD};
         border: 1px solid {c.BORDER_LIGHT};

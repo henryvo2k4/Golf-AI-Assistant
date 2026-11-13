@@ -135,7 +135,8 @@ def test_ui_theme_icons_and_mirror_criterion():
 
     app = QApplication.instance() or QApplication([])
     assert app is not None
-    assert "QFrame#TopBar" in build_app_stylesheet()
+    assert "QFrame#FloatingPill" in build_app_stylesheet()
+    assert "QFrame#SlideCard" in build_app_stylesheet()
     assert b"<svg" in build_svg_bytes("target", color="#10B981")
 
     crit = FaultCriterion(
