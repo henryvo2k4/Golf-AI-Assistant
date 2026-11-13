@@ -45,4 +45,6 @@ desktop.ini
 
 # Temporary outputs / Recorded debug swings
 assets/videos/recordings/
+assets/videos/*.mp4
+.pytest_cache/
 *.log

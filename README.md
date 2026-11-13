@@ -1,73 +1,54 @@
 # HỆ THỐNG TRỢ LÝ AI PHÂN TÍCH TƯ THẾ GOLF (VAR GOLF)
 
-Hệ thống Trợ lý AI Phân tích Tư thế Golf thời gian thực hỗ trợ Golfer phát hiện và sửa lỗi kỹ thuật swing ngoài sân tập.
-Chế độ hoạt động: **Hiển thị trực quan 100% trên màn hình (Visual HUD & On-screen Alerts)**.
+Ứng dụng Desktop chuyên nghiệp hỗ trợ Golfer tập luyện và phát hiện lỗi kỹ thuật Swing bằng AI.
+Giao diện **PySide6 (Qt6)** hiện đại, tiếng Việt có dấu sắc nét, không hiện cửa sổ CMD.
 
 ---
 
-## 1. KIẾN TRÚC PHẦN CỨNG
+## 1. QUY TRÌNH SỬ DỤNG TRÊN ỨNG DỤNG
 
-- **Mắt thần (Camera):** Webcam EMEET C60E 60FPS Full HD (Sony CMOS sensor, ren ốc 1/4" chuẩn tripod).
-- **Bộ não xử lý (Mini PC):** HP ProDesk 600 G4 Mini (Intel Core i5-8500T 6 nhân, 8GB RAM, SSD NVMe 256GB).
-- **Màn hình hiển thị:** Màn hình di động 10.5" 3:2 IPS (420 nits chống chói ngoài trời).
-- **Kích hoạt (Trigger):** Bàn đạp dậm chân USB công nghiệp (vỏ kim loại, cáp 5m, chuẩn phím Spacebar HID).
-- **Nguồn điện:** Pin sạc dự phòng CUKTECH 120W 25.000mAh cấp điện độc lập 4-5 tiếng.
-
----
-
-## 2. NGUYÊN LÝ HOẠT ĐỘNG CỦA AI
-
-1. **Google MediaPipe Pose:** Nhận diện và theo dõi 33 điểm mốc (3D Landmarks) trên cơ thể người chơi với tốc độ >60 FPS trực tiếp trên CPU.
-2. **Biomechanical Vector Math:** Tính toán góc uốn của khuỷu tay trái (giữa Vai 11 - Cùi chỏ 13 - Cổ tay 15) bằng công thức tích vô hướng vector không gian.
-3. **State Machine (Top of Swing Detection):** Tự động phát hiện thời điểm gậy vung lên đỉnh cao nhất (khi cổ tay đạt độ cao cực đại trong khung hình).
-4. **Phản hồi trực quan 100% trên màn hình (Visual Alert):**
-   - **Tư thế Đạt chuẩn PGA ($\ge 150^\circ$):** Đường khung xương tay màu xanh lá, hiện Banner lớn màu xanh: *"XUAT SAC: TAY TRAI THANG DAT CHUAN PGA"*.
-   - **Tư thế Lỗi gập tay ($< 150^\circ$):** Khoanh 2 vòng tròn đỏ nhấp nháy tại cùi chỏ, hiện Banner đỏ cảnh báo: *"LOI: GAP TAY TRAI O DINH SWING (Goc chi dat XX do)"*.
+1. **Mở ứng dụng:** Nhấp đúp file **`Mo_Ung_Dung_Golf_AI.vbs`** (hoặc `run_test.bat`) — Màn hình Camera Live hiển thị trực tiếp.
+2. **Bấm nút / Dậm bàn đạp (`SPACE`):** Hệ thống **đếm ngược 5 giây** (`5... 4... 3... 2... 1...`) để người chơi bước vào thảm chuẩn bị tư thế.
+3. **Tự động quay 10 giây:** Ghi hình trọn vẹn cú đánh (có nút **Phân tích ngay** nếu đánh xong sớm hơn 10s).
+4. **Phân tích toàn diện 5 lỗi Golf chuẩn PGA & Khoanh vùng lỗi trên ảnh:**
+   - **Gập khuỷu tay dẫn hướng (Chicken Wing):** Đo góc vai – khuỷu – cổ tay tại đỉnh swing & chạm bóng (chuẩn $\ge 150^\circ$).
+   - **Nhấp nhô / Ngẩng đầu sớm (Head Stability):** Đo biên độ dao động dọc đầu so với lúc Setup (chuẩn $\le 7\%$ chiều cao).
+   - **Ngược trục cột sống (Reverse Spine Angle):** Đo độ nghiêng thân trên tại đỉnh swing (không đổ ngược về phía mục tiêu).
+   - **Trượt / Lắc hông ngang (Pelvic Sway):** Phát hiện hông sau trượt quá trục chân sau trong pha backswing.
+   - **Ổn định chân trụ & đầu gối:** Kiểm tra lỗi sụp đầu gối ($< 128^\circ$) hoặc bật thẳng gối quá sớm (Early Extension).
+5. **Xem lại Slow-Motion:** Chuyển sang tab **`🎬 Xem lại Slow-Motion`** để tua chậm cú đánh ở tốc độ `0.25x`, `0.5x`, `1.0x` kèm khung xương AI bám theo từng khung hình.
 
 ---
 
-## 3. CẤU TRÚC DỰ ÁN
+## 2. CẤU TRÚC MÃ NGUỒN
 
 ```
 D:\Henry\Golf\
-├── .venv/                    # Môi trường ảo Python 3.11 độc lập
-├── config.py                 # File cấu hình tham số (ngưỡng 150°, phím trigger, màu sắc UI)
-├── requirements.txt          # Danh sách thư viện Python (opencv, mediapipe, numpy, pytest)
-├── run_app.py                # File chạy chính (Main entry point)
-├── run_test.bat              # Script 1-click chạy thử nghiệm trên Windows
-├── README.md                 # Hướng dẫn chi tiết
-│
+├── Mo_Ung_Dung_Golf_AI.vbs   # Mở thẳng App Desktop (không hiện CMD đen)
+├── run_test.bat              # Launcher dự phòng
+├── run_app.py                # Điểm khởi chạy ứng dụng PySide6
+├── config.py                 # Ngưỡng chuẩn PGA, cấu hình đếm ngược 5s & quay 10s
+├── requirements.txt          # opencv-python, mediapipe, PySide6, pillow, numpy, pytest
+├── assets/models/
+│   └── pose_landmarker_full.task  # Mô hình AI Google MediaPipe Tasks
 ├── src/
+│   ├── core/
+│   │   ├── pose_detector.py  # Wrapper MediaPipe 1.2.2 PoseLandmarker
+│   │   └── swing_analyzer.py # Phân tích chuỗi video & chấm điểm 5 lỗi PGA
 │   ├── utils/
-│   │   ├── geometry.py       # Giải thuật Vector tính góc uốn khớp 2D/3D
-│   │   └── drawing.py        # Vẽ Dashboard HUD, thước đo góc & Banner cảnh báo
-│   └── core/
-│       ├── pose_detector.py  # Wrapper MediaPipe Pose (xử lý hình ảnh 60FPS)
-│       └── swing_analyzer.py # State Machine nhận diện đỉnh Swing & chấm điểm
-│
+│   │   ├── geometry.py       # Toán học Vector không gian
+│   │   └── drawing.py        # Vẽ vòng tròn khoanh vùng lỗi & hộp text tiếng Việt (Pillow)
+│   └── ui/
+│       └── main_window.py    # Giao diện Desktop PySide6 (Live, Countdown, Replay, Cards)
 └── tests/
-    └── test_geometry.py      # Bộ kiểm thử toán học Vector (Unit Tests)
+    ├── test_geometry.py
+    └── test_pipeline.py
 ```
 
 ---
 
-## 4. HƯỚNG DẪN CHẠY THỬ NGHIỆM
+## 3. KIỂM THỬ
 
-### Cách 1: Chạy 1-Click bằng file BAT (Khuyên dùng)
-Nhấp đúp chuột vào file **`run_test.bat`**:
-- Nhấn phím `1` để khởi động ứng dụng với Webcam.
-- Nhấn phím `2` để chạy kiểm tra toán học Vector.
-
-### Cách 2: Chạy bằng dòng lệnh Terminal
 ```bash
-# Kích hoạt môi trường ảo
-.\.venv\Scripts\activate
-
-# Chạy với Webcam
-python run_app.py --source 0
+.\.venv\Scripts\python.exe -m pytest tests/ -v
 ```
-
-### Thao tác điều khiển trong ứng dụng:
-- Bấm phím **SPACE** (hoặc dậm bàn đạp chân): Bắt đầu ghi nhận cú swing.
-- Bấm phím **R**: Reset về trạng thái ban đầu để đánh cú mới.
-- Bấm phím **Q**: Thoát chương trình.

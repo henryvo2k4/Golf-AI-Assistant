@@ -1,76 +1,37 @@
 """
 MODULE TOÁN HỌC HÌNH HỌC VECTOR (VECTOR GEOMETRY)
-Chịu trách nhiệm tính toán góc uốn khớp xương trong không gian 2D và 3D.
-Dành cho: Phân tích góc khuỷu tay, góc vai, góc hông trong cú Swing Golf.
+Tính toán góc uốn khớp xương, khoảng cách chuẩn hóa và độ nghiêng trục cột sống.
 """
 
+import math
 import numpy as np
 
 
 def calculate_angle_2d(point_a, point_b, point_c) -> float:
     """
-    Tính góc uốn (đơn vị: Độ) tại đỉnh B tạo bởi 3 điểm A, B, C trong mặt phẳng 2D (x, y).
-
-    Trong bài toán Swing Golf:
-        - Điểm A: Khớp vai (Shoulder)
-        - Điểm B: Khớp khuỷu tay / cùi chỏ (Elbow) - Đỉnh góc
-        - Điểm C: Khớp cổ tay (Wrist)
-
-    Công thức Toán học Vector:
-        Vector BA = A - B
-        Vector BC = C - B
-        cos(theta) = (BA . BC) / (|BA| * |BC|)
-        theta = arccos(cos(theta)) chuyển sang độ (0° đến 180°)
-
-    Tham số:
-        point_a: Tọa độ [x, y] của điểm đầu (Vai)
-        point_b: Tọa độ [x, y] của đỉnh góc (Cùi chỏ)
-        point_c: Tọa độ [x, y] của điểm cuối (Cổ tay)
-
-    Trả về:
-        float: Góc theta tính bằng độ (từ 0.0° đến 180.0°)
+    Tính góc uốn (Độ) tại đỉnh B tạo bởi 3 điểm A, B, C trong mặt phẳng 2D (x, y).
     """
     a = np.array(point_a[:2], dtype=np.float64)
     b = np.array(point_b[:2], dtype=np.float64)
     c = np.array(point_c[:2], dtype=np.float64)
 
-    # Tạo 2 vector từ đỉnh B
     ba = a - b
     bc = c - b
 
-    # Độ dài chuẩn (Norm / Magnitude) của 2 vector
     norm_ba = np.linalg.norm(ba)
     norm_bc = np.linalg.norm(bc)
 
-    # Tránh chia cho 0 nếu các điểm trùng nhau
     if norm_ba == 0.0 or norm_bc == 0.0:
         return 0.0
 
-    # Tích vô hướng (Dot Product)
     cosine_angle = np.dot(ba, bc) / (norm_ba * norm_bc)
-
-    # Giới hạn giá trị cos trong đoạn [-1.0, 1.0] để tránh lỗi số học làm tròn
     cosine_angle = np.clip(cosine_angle, -1.0, 1.0)
-
-    # Tính góc arccos và đổi sang độ
-    angle_rad = np.arccos(cosine_angle)
-    angle_deg = np.degrees(angle_rad)
-
-    return float(angle_deg)
+    return float(np.degrees(np.arccos(cosine_angle)))
 
 
 def calculate_angle_3d(point_a, point_b, point_c) -> float:
     """
-    Tính góc uốn (đơn vị: Độ) tại đỉnh B tạo bởi 3 điểm A, B, C trong không gian 3D (x, y, z).
-    Tận dụng dữ liệu tọa độ chiều sâu Z từ MediaPipe Pose 3D landmarks.
-
-    Tham số:
-        point_a: Tọa độ [x, y, z]
-        point_b: Tọa độ [x, y, z] (Đỉnh góc)
-        point_c: Tọa độ [x, y, z]
-
-    Trả về:
-        float: Góc không gian 3D (0.0° đến 180.0°)
+    Tính góc uốn (Độ) tại đỉnh B tạo bởi 3 điểm A, B, C trong không gian 3D (x, y, z).
     """
     a = np.array(point_a[:3], dtype=np.float64)
     b = np.array(point_b[:3], dtype=np.float64)
@@ -87,6 +48,38 @@ def calculate_angle_3d(point_a, point_b, point_c) -> float:
 
     cosine_angle = np.dot(ba, bc) / (norm_ba * norm_bc)
     cosine_angle = np.clip(cosine_angle, -1.0, 1.0)
+    return float(np.degrees(np.arccos(cosine_angle)))
 
-    angle_rad = np.arccos(cosine_angle)
-    return float(np.degrees(angle_rad))
+
+def midpoint_2d(p1, p2) -> tuple[float, float]:
+    """Tính trung điểm 2D giữa 2 tọa độ."""
+    return ((p1[0] + p2[0]) * 0.5, (p1[1] + p2[1]) * 0.5)
+
+
+def distance_2d(p1, p2) -> float:
+    """Tính khoảng cách Euclidean 2D."""
+    return float(math.hypot(p1[0] - p2[0], p1[1] - p2[1]))
+
+
+def calculate_spine_away_tilt_deg(mid_hip, mid_shoulder, target_dir_sign: float) -> float:
+    """
+    Tính góc nghiêng ngang của trục cột sống (tính từ Tâm hông lên Tâm vai) so với phương thẳng đứng.
+    - Trả về giá trị DƯƠNG (+) nếu thân trên nghiêng RA XA mục tiêu (tư thế chuẩn ở đỉnh swing).
+    - Trả về giá trị ÂM (-) nếu thân trên nghiêng NGƯỢC VỀ PHÍA MỤC TIÊU (Lỗi Reverse Spine Angle).
+
+    Tham số:
+        mid_hip: (x, y) tâm hông
+        mid_shoulder: (x, y) tâm vai
+        target_dir_sign: +1.0 nếu hướng mục tiêu là chiều dương X (bên phải ảnh), -1.0 nếu bên trái ảnh.
+    """
+    dx = mid_shoulder[0] - mid_hip[0]
+    dy = mid_hip[1] - mid_shoulder[1]  # Dương khi vai ở phía trên hông (OpenCV y hướng xuống)
+
+    if dy <= 1e-6:
+        return 0.0
+
+    # Góc nghiêng theo phương X dương (radian -> độ)
+    angle_from_vertical = math.degrees(math.atan2(dx, dy))
+    # Nếu nghiêng cùng chiều với hướng mục tiêu (dx * target_dir_sign > 0) -> đó là nghiêng VỀ mục tiêu (âm)
+    # Nếu nghiêng ngược chiều hướng mục tiêu -> nghiêng RA XA mục tiêu (dương)
+    return -angle_from_vertical * target_dir_sign

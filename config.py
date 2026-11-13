@@ -1,50 +1,53 @@
 """
 CẤU HÌNH THÔNG SỐ TOÀN DỰ ÁN TRỢ LÝ AI GOLF (VAR GOLF)
-Hiển thị trực quan toàn bộ kết quả lên màn hình (Visual HUD & On-screen Alerts)
+Giao diện Desktop trực quan + Phân tích toàn diện 5 lỗi sinh trắc học Golf
 """
 
-# ==============================
-# CẤU HÌNH CAMERA & VIDEO NGUỒN
-# ==============================
-DEFAULT_VIDEO_SOURCE = 0              # 0 là Webcam mặc định, hoặc đường dẫn file .mp4
-TARGET_FPS = 60                       # Tần số quét mục tiêu của EMEET C60E
-FRAME_WIDTH = 1280                    # Độ phân giải hiển thị chuẩn HD
-FRAME_HEIGHT = 720
+import os
+
+# Đường dẫn gốc dự án
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+MODEL_PATH = os.path.join(BASE_DIR, "assets", "models", "pose_landmarker_full.task")
+RECORDINGS_DIR = os.path.join(BASE_DIR, "assets", "videos")
+LAST_SWING_VIDEO_PATH = os.path.join(RECORDINGS_DIR, "last_swing.mp4")
 
 # ==============================
-# CẤU HÌNH PHÂN TÍCH GOLF SWING
+# CẤU HÌNH CAMERA & GHI HÌNH
 # ==============================
-# Người chơi tay thuận (Right-handed): Tay dẫn hướng (Lead Arm) là TAY TRÁI
-# Điểm xương MediaPipe:
-# 11: Vai trái (Left Shoulder)
-# 13: Cùi chỏ trái (Left Elbow)
-# 15: Cổ tay trái (Left Wrist)
-GOLFER_HANDEDNESS = "right"
+DEFAULT_CAMERA_INDEX = 0
+CAPTURE_WIDTH = 1280
+CAPTURE_HEIGHT = 720
+TARGET_FPS = 30
 
-# Ngưỡng góc uốn tay trái tối thiểu ở đỉnh swing (Chuẩn PGA >= 150 độ)
-# Dưới 150 độ là bị lỗi co tay / gập cùi chỏ (Bent Lead Arm / Chicken Wing)
-LEAD_ARM_MIN_ANGLE = 150.0
-
-# ==============================
-# CẤU HÌNH BÀN ĐẠP CHÂN (FOOT PEDAL)
-# ==============================
-# Bàn đạp chân USB vỏ kim loại TFS gửi tín hiệu mã phím Spacebar (ASCII 32)
-TRIGGER_KEY_CODE = 32                 # Mã phím Space trong OpenCV (ord(' '))
-RESET_KEY_CODE = ord('r')             # Phím R để reset trạng thái
-QUIT_KEY_CODE = ord('q')              # Phím Q để thoát
+# Thời gian đếm ngược & ghi hình theo yêu cầu thực chiến
+COUNTDOWN_SECONDS = 5       # Đếm ngược 5 giây để golfer bước lên thảm vào vị trí
+RECORD_SECONDS = 10         # Ghi hình tối đa 10 giây cho mỗi lượt đánh
+MIRROR_CAMERA_DEFAULT = True
 
 # ==============================
-# CẤU HÌNH BỘ NHỚ ĐỆM (BUFFER)
+# CẤU HÌNH PHÂN TÍCH SINH TRẮC HỌC GOLF (CHUẨN PGA)
 # ==============================
-BUFFER_SECONDS = 5
-MAX_BUFFER_FRAMES = TARGET_FPS * BUFFER_SECONDS
+GOLFER_HANDEDNESS = "right"          # Mặc định thuận tay phải
+
+# 1. Góc khuỷu tay dẫn hướng (Tay trái cho người thuận tay phải)
+LEAD_ARM_MIN_ANGLE = 150.0           # Chuẩn PGA >= 150° tại Đỉnh Swing & Chạm bóng
+
+# 2. Nhấp nhô / Ngẩng đầu sớm (Head Lift / Dip)
+HEAD_DRIFT_MAX_RATIO = 0.07          # Dịch chuyển dọc đầu tối đa <= 7% chiều cao cơ thể
+
+# 3. Trượt / Lắc hông ngang (Pelvic Sway)
+HIP_SWAY_MAX_RATIO = 0.14            # Trượt hông ngang qua trục chân sau tối đa <= 14% độ rộng thế đứng
+
+# 4. Ngược trục cột sống (Reverse Spine Angle)
+REVERSE_SPINE_MAX_DEG = 4.0          # Độ nghiêng cột sống ngược về phía mục tiêu tối đa <= 4° tại đỉnh swing
+
+# 5. Độ ổn định đầu gối chân trụ (Knee Stability)
+KNEE_MIN_ANGLE = 128.0               # Không chùng sụp gối dưới 128°
+KNEE_MAX_ANGLE = 178.0               # Không duỗi thẳng cứng sớm (Early Extension) ở đỉnh swing/impact
 
 # ==============================
-# MÀU SẮC GIAO DIỆN (ĐỊNH DẠNG BGR)
+# CẤU HÌNH FONT CHỮ TIẾNG VIỆT (WINDOWS)
 # ==============================
-COLOR_GREEN = (0, 230, 64)            # Màu xanh lá đạt chuẩn PGA
-COLOR_RED = (0, 0, 255)               # Màu đỏ cảnh báo lỗi
-COLOR_YELLOW = (0, 215, 255)          # Màu vàng trạng thái chuẩn bị / chờ
-COLOR_CYAN = (255, 255, 0)            # Màu xanh dương nhạt
-COLOR_WHITE = (255, 255, 255)         # Màu trắng chữ
-COLOR_DARK_BG = (20, 20, 20)          # Màu nền bảng điều khiển HUD
+FONT_BOLD_PATH = r"C:\Windows\Fonts\segoeuib.ttf"
+FONT_REGULAR_PATH = r"C:\Windows\Fonts\segoeui.ttf"
+FALLBACK_FONT_PATH = r"C:\Windows\Fonts\arial.ttf"
