@@ -296,17 +296,17 @@ class BatchSwingAnalyzer:
         if min_arm_angle < config.LEAD_ARM_MIN_ANGLE_3D:
             criteria.append(FaultCriterion(
                 code="bent_lead_arm",
-                title="Gập khuỷu tay dẫn hướng (Chicken Wing)",
+                title="Bent Lead Elbow (Chicken Wing)",
                 status="error",
                 measured_text=f"{min_arm_angle:.1f}° (3D)",
-                standard_text=f"≥ {config.LEAD_ARM_MIN_ANGLE_3D:.0f}°",
+                standard_text=f">= {config.LEAD_ARM_MIN_ANGLE_3D:.0f}°",
                 frame_idx=worst_arm_idx,
                 description=(
-                    f"Đo theo không gian 3D tại Đỉnh Swing / Downswing, khuỷu tay "
-                    f"{'trái' if self.handedness == 'right' else 'phải'} bị gập xuống còn {min_arm_angle:.1f}° "
-                    f"(chuẩn PGA ≥ {config.LEAD_ARM_MIN_ANGLE_3D:.0f}°). Gập tay thu hẹp bán kính vung gậy, gây đánh Slice và hụt lực."
+                    f"Measured in 3D space during Top/Downswing, your "
+                    f"{'left' if self.handedness == 'right' else 'right'} elbow flexed to {min_arm_angle:.1f}° "
+                    f"(PGA target >= {config.LEAD_ARM_MIN_ANGLE_3D:.0f}°). Bending narrows your swing arc, causing slices and power loss."
                 ),
-                correction_tip="Đẩy cổ tay ra xa lồng ngực khi đưa gậy lên đỉnh, cảm giác vươn rộng vòng cung swing.",
+                correction_tip="Push your hands away from your chest toward the top of the swing to keep a wide arc.",
                 annotation_type="elbow_angle",
                 annotation_data={
                     "shoulder": lm_arm_2d[sk["lead_shoulder"]][:2],
@@ -319,13 +319,13 @@ class BatchSwingAnalyzer:
             top_ang = arm_angles_3d[top_idx] if arm_angles_3d[top_idx] > 0 else min_arm_angle
             criteria.append(FaultCriterion(
                 code="bent_lead_arm",
-                title="Độ thẳng cánh tay dẫn hướng",
+                title="Lead Arm Extension",
                 status="passed",
                 measured_text=f"{min_arm_angle:.1f}° (3D)",
-                standard_text=f"≥ {config.LEAD_ARM_MIN_ANGLE_3D:.0f}°",
+                standard_text=f">= {config.LEAD_ARM_MIN_ANGLE_3D:.0f}°",
                 frame_idx=top_idx,
-                description=f"Tay dẫn hướng giữ duỗi thẳng chuẩn xác ({min_arm_angle:.1f}° đo 3D) xuyên suốt pha đỉnh swing tới chạm bóng.",
-                correction_tip="Duy trì độ duỗi tự nhiên này mà không gồng cứng cơ vai.",
+                description=f"Lead arm stayed cleanly extended ({min_arm_angle:.1f}° in 3D) from top of backswing through impact.",
+                correction_tip="Maintain this natural extension without locking shoulder tension.",
                 annotation_type="elbow_angle",
                 annotation_data={
                     "shoulder": lm_2d[top_idx][sk["lead_shoulder"]][:2],
@@ -363,20 +363,20 @@ class BatchSwingAnalyzer:
                 if is_v_err or is_h_err:
                     use_idx = worst_v_idx if (v_ratio / config.HEAD_VERTICAL_DRIFT_MAX_RATIO) >= (h_ratio / config.HEAD_LATERAL_DRIFT_MAX_RATIO) else worst_h_idx
                     nose_pt = lm_2d[use_idx]["nose"][:2]
-                    reason = ("ngẩng đầu lên sớm" if dy < 0 else "tụt/gập đầu xuống") if is_v_err else "lắc đầu sang ngang"
+                    reason = ("early head lift" if dy < 0 else "head dip") if is_v_err else "lateral head sway"
                     max_pct = max(v_ratio, h_ratio) * 100.0
                     criteria.append(FaultCriterion(
                         code="head_movement",
-                        title=f"Lỗi giữ trục đầu ({reason})",
+                        title=f"Head Instability ({reason})",
                         status="error",
-                        measured_text=f"Lệch {max_pct:.1f}%",
-                        standard_text=f"≤ {config.HEAD_VERTICAL_DRIFT_MAX_RATIO*100:.0f}%",
+                        measured_text=f"Drift {max_pct:.1f}%",
+                        standard_text=f"<= {config.HEAD_VERTICAL_DRIFT_MAX_RATIO*100:.0f}%",
                         frame_idx=use_idx,
                         description=(
-                            f"Đầu bị {reason} với biên độ {max_pct:.1f}% chiều cao cơ thể so với lúc Setup. "
-                            "Đầu nhấp nhô làm thay đổi điểm thấp nhất của đầu gậy, dễ đánh cạp đất (Fat) hoặc đánh mỏng (Thin)."
+                            f"Head showed {reason} of {max_pct:.1f}% of body height relative to Setup. "
+                            "Vertical or lateral head drift shifts the swing low-point, causing fat or thin strikes."
                         ),
-                        correction_tip="Giữ cố định tầm mắt nhìn thẳng vào tâm bóng tới khi đầu gậy lướt qua mặt cỏ mới xoay đầu nhìn bóng.",
+                        correction_tip="Keep your eyes focused steadily on the ball until the clubhead sweeps through impact.",
                         annotation_type="head_drift",
                         annotation_data={
                             "nose": nose_pt,
@@ -388,13 +388,13 @@ class BatchSwingAnalyzer:
                     max_pct = max(v_ratio, h_ratio) * 100.0
                     criteria.append(FaultCriterion(
                         code="head_movement",
-                        title="Độ ổn định trục đầu",
+                        title="Head Stability",
                         status="passed",
-                        measured_text=f"Lệch {max_pct:.1f}%",
-                        standard_text=f"≤ {config.HEAD_VERTICAL_DRIFT_MAX_RATIO*100:.0f}%",
+                        measured_text=f"Drift {max_pct:.1f}%",
+                        standard_text=f"<= {config.HEAD_VERTICAL_DRIFT_MAX_RATIO*100:.0f}%",
                         frame_idx=top_idx,
-                        description=f"Trục đầu giữ cực kỳ ổn định (dao động chỉ {max_pct:.1f}%), bảo toàn tâm quay của cú swing.",
-                        correction_tip="Giữ tâm nhìn ổn định rất tốt.",
+                        description=f"Head axis stayed rock steady (only {max_pct:.1f}% drift), preserving your swing center.",
+                        correction_tip="Excellent eye and head discipline.",
                         annotation_type="head_drift",
                         annotation_data={
                             "nose": lm_2d[top_idx]["nose"][:2],
@@ -405,13 +405,13 @@ class BatchSwingAnalyzer:
         else:
             criteria.append(FaultCriterion(
                 code="head_movement",
-                title="Độ ổn định trục đầu",
+                title="Head Stability",
                 status="not_visible",
-                measured_text="Chưa rõ đầu",
-                standard_text="Thấy rõ khuôn mặt",
+                measured_text="Head unclear",
+                standard_text="Clear face view",
                 frame_idx=top_idx,
-                description="Không nhận diện rõ vùng đầu ở tư thế chuẩn bị.",
-                correction_tip="Điều chỉnh góc quay thấy trọn đầu đến chân.",
+                description="Could not clearly detect head landmarks at address.",
+                correction_tip="Adjust camera framing so your full body from head to toe is visible.",
                 annotation_type="none",
             ))
 
@@ -429,16 +429,16 @@ class BatchSwingAnalyzer:
             if sh_turn < config.SHOULDER_TURN_MIN_DEG:
                 criteria.append(FaultCriterion(
                     code="shoulder_turn",
-                    title="Thiếu độ xoay vai (Arm Swing)",
+                    title="Limited Shoulder Turn (Arm Swing)",
                     status="error",
-                    measured_text=f"Xoay {sh_turn:.1f}°",
-                    standard_text=f"≥ {config.SHOULDER_TURN_MIN_DEG:.0f}°",
+                    measured_text=f"Turn {sh_turn:.1f}°",
+                    standard_text=f">= {config.SHOULDER_TURN_MIN_DEG:.0f}°",
                     frame_idx=top_idx,
                     description=(
-                        f"Ở Đỉnh Swing, vai mới chỉ xoay được {sh_turn:.1f}° (chuẩn PGA xoay từ 75° - 100°). "
-                        "Xoay vai ít khiến người chơi chỉ dùng lực tay để đánh, mất khoảng cách và thiếu ổn định."
+                        f"At Top of Swing, shoulders rotated only {sh_turn:.1f}° (PGA target 75° - 100°). "
+                        "Insufficient torso coil forces an arm-dominated swing with reduced clubhead speed."
                     ),
-                    correction_tip="Khi đưa gậy lên, hãy xoay hẳn vai trái xuống dưới cằm và hướng lưng về phía mục tiêu.",
+                    correction_tip="Coil your lead shoulder smoothly under your chin and turn your back toward the target.",
                     annotation_type="shoulder_turn",
                     annotation_data={
                         "left_shoulder": lm_2d[top_idx]["left_shoulder"][:2],
@@ -450,13 +450,13 @@ class BatchSwingAnalyzer:
             else:
                 criteria.append(FaultCriterion(
                     code="shoulder_turn",
-                    title="Biên độ xoay vai (Shoulder Turn)",
+                    title="Shoulder Turn Range",
                     status="passed",
-                    measured_text=f"Xoay {sh_turn:.1f}°",
-                    standard_text=f"≥ {config.SHOULDER_TURN_MIN_DEG:.0f}°",
+                    measured_text=f"Turn {sh_turn:.1f}°",
+                    standard_text=f">= {config.SHOULDER_TURN_MIN_DEG:.0f}°",
                     frame_idx=top_idx,
-                    description=f"Độ xoay vai ở đỉnh swing đạt {sh_turn:.1f}° rất tốt, tích trữ đầy đủ năng lượng xoắn cho cú Downswing.",
-                    correction_tip="Tiếp tục giữ nhịp xoay vai mượt mà này.",
+                    description=f"Shoulder rotation reached {sh_turn:.1f}° at the top, storing strong elastic power for downswing.",
+                    correction_tip="Keep maintaining this full, relaxed shoulder coil.",
                     annotation_type="shoulder_turn",
                     annotation_data={
                         "left_shoulder": lm_2d[top_idx]["left_shoulder"][:2],
@@ -468,13 +468,13 @@ class BatchSwingAnalyzer:
         else:
             criteria.append(FaultCriterion(
                 code="shoulder_turn",
-                title="Biên độ xoay vai (Shoulder Turn)",
+                title="Shoulder Turn Range",
                 status="not_visible",
                 measured_text="N/A",
-                standard_text=f"≥ {config.SHOULDER_TURN_MIN_DEG:.0f}°",
+                standard_text=f">= {config.SHOULDER_TURN_MIN_DEG:.0f}°",
                 frame_idx=top_idx,
-                description="Không đủ dữ liệu khớp 2 bên vai để đo độ xoay.",
-                correction_tip="Đảm bảo camera nhìn thấy rõ cả vai trái và vai phải.",
+                description="Insufficient shoulder landmark visibility to measure rotation.",
+                correction_tip="Ensure both shoulders are unobstructed in the camera frame.",
                 annotation_type="none",
             ))
 
@@ -495,42 +495,42 @@ class BatchSwingAnalyzer:
                 if away_tilt < -config.REVERSE_SPINE_MAX_DEG:
                     criteria.append(FaultCriterion(
                         code="reverse_spine",
-                        title="Ngược trục cột sống (Reverse Spine)",
+                        title="Reverse Spine Angle",
                         status="error",
-                        measured_text=f"Đổ ngược {abs(away_tilt):.1f}°",
-                        standard_text="≥ -4° (Giữ trục)",
+                        measured_text=f"Reverse {abs(away_tilt):.1f}°",
+                        standard_text=">= -4° (Centered)",
                         frame_idx=top_idx,
                         description=(
-                            f"Tại đỉnh Swing, thân trên bị đổ ngược {abs(away_tilt):.1f}° về phía mục tiêu thay vì nghiêng nhẹ ra sau. "
-                            "Đây là nguyên nhân chính gây đau lưng dưới và đánh chém bóng từ ngoài vào trong (Over-the-top)."
+                            f"At Top of Swing, upper spine tilted {abs(away_tilt):.1f}° toward the target instead of staying slightly behind the ball. "
+                            "This major TPI fault strains the lower back and promotes an over-the-top path."
                         ),
-                        correction_tip="Khi xoay lên đỉnh, giữ đầu hơi chếch sau bóng và dồn trọng tâm vào mặt trong đùi chân sau.",
+                        correction_tip="Keep your sternum slightly behind the ball at the top and load into the inside of your trail thigh.",
                         annotation_type="spine_tilt",
                         annotation_data={"mid_hip": mid_hip_top, "mid_shoulder": mid_sh_top},
                     ))
                 else:
                     criteria.append(FaultCriterion(
                         code="reverse_spine",
-                        title="Trục cột sống ở Đỉnh Swing",
+                        title="Spine Axis at Top",
                         status="passed",
                         measured_text=f"{away_tilt:+.1f}°",
-                        standard_text="≥ -4°",
+                        standard_text=">= -4°",
                         frame_idx=top_idx,
-                        description=f"Trục cột sống xoay đúng kỹ thuật ({away_tilt:+.1f}°), không bị đổ ngược về phía mục tiêu.",
-                        correction_tip="Trục xoay cột sống rất an toàn và chuẩn kỹ thuật.",
+                        description=f"Spine axis coiled properly ({away_tilt:+.1f}°) without reverse tilting toward the target.",
+                        correction_tip="Safe and biomechanically sound torso pivot.",
                         annotation_type="spine_tilt",
                         annotation_data={"mid_hip": mid_hip_top, "mid_shoulder": mid_sh_top},
                     ))
             else:
                 criteria.append(FaultCriterion(
                     code="reverse_spine",
-                    title="Trục cột sống ở Đỉnh Swing",
+                    title="Spine Axis at Top",
                     status="not_visible",
-                    measured_text="Chưa thấy hông",
-                    standard_text="Thấy vai & hông",
+                    measured_text="Hips unclear",
+                    standard_text="Shoulders & hips visible",
                     frame_idx=top_idx,
-                    description="Chưa quan sát được cả vai và hông trong khung hình.",
-                    correction_tip="Lùi xa camera khoảng 2m - 2.5m để lấy toàn thân.",
+                    description="Could not track both shoulders and hips clearly.",
+                    correction_tip="Step back 2m - 2.5m so your full torso and legs fit inside the frame.",
                     annotation_type="none",
                 ))
 
@@ -553,16 +553,16 @@ class BatchSwingAnalyzer:
                 if sway_ratio > config.HIP_SWAY_MAX_RATIO:
                     criteria.append(FaultCriterion(
                         code="pelvic_sway",
-                        title="Trượt / Lắc hông ngang (Pelvic Sway)",
+                        title="Lateral Pelvic Sway",
                         status="error",
-                        measured_text=f"Trượt {sway_ratio*100:.1f}%",
-                        standard_text=f"≤ {config.HIP_SWAY_MAX_RATIO*100:.0f}%",
+                        measured_text=f"Sway {sway_ratio*100:.1f}%",
+                        standard_text=f"<= {config.HIP_SWAY_MAX_RATIO*100:.0f}%",
                         frame_idx=worst_sway_idx,
                         description=(
-                            f"Hông sau bị đẩy trượt ngang ra ngoài trục chân sau tới {sway_ratio*100:.1f}% bề rộng thế đứng "
-                            "trong pha đưa gậy lên, làm mất lực xoắn và dễ đánh lệch tâm bóng."
+                            f"Trail hip drifted laterally past your trail ankle by {sway_ratio*100:.1f}% of stance width during backswing, "
+                            "bleeding rotational torque and causing inconsistent ball contact."
                         ),
-                        correction_tip="Xoay túi quần sau ra phía lưng thay vì đẩy hông trượt ngang qua chân trụ.",
+                        correction_tip="Turn your trail pocket straight back behind you instead of sliding hips sideways.",
                         annotation_type="hip_sway",
                         annotation_data={
                             "trail_hip": lm_2d[worst_sway_idx][sk["trail_hip"]][:2],
@@ -573,13 +573,13 @@ class BatchSwingAnalyzer:
                 else:
                     criteria.append(FaultCriterion(
                         code="pelvic_sway",
-                        title="Kiểm soát trượt hông (Pelvic Sway)",
+                        title="Pelvic Sway Control",
                         status="passed",
                         measured_text=f"{sway_ratio*100:.1f}%",
-                        standard_text=f"≤ {config.HIP_SWAY_MAX_RATIO*100:.0f}%",
+                        standard_text=f"<= {config.HIP_SWAY_MAX_RATIO*100:.0f}%",
                         frame_idx=top_idx,
-                        description="Hông xoay gọn gàng trong trục hai bàn chân, không bị lắc hông sang ngang.",
-                        correction_tip="Giữ trục hông xoay rất vững.",
+                        description="Hips rotated cleanly inside your stance frame without lateral sliding.",
+                        correction_tip="Great lower-body rotational stability.",
                         annotation_type="hip_sway",
                         annotation_data={
                             "trail_hip": lm_2d[top_idx][sk["trail_hip"]][:2],
@@ -590,13 +590,13 @@ class BatchSwingAnalyzer:
             else:
                 criteria.append(FaultCriterion(
                     code="pelvic_sway",
-                    title="Kiểm soát trượt hông (Pelvic Sway)",
+                    title="Pelvic Sway Control",
                     status="not_visible",
-                    measured_text="Chưa thấy chân",
-                    standard_text="Thấy hông & 2 chân",
+                    measured_text="Feet unclear",
+                    standard_text="Hips & ankles visible",
                     frame_idx=top_idx,
-                    description="Chưa thấy hai bàn chân trong khung hình.",
-                    correction_tip="Chỉnh camera lùi ra để lấy toàn thân từ đầu tới gót chân.",
+                    description="Ankles and feet were not fully visible in frame.",
+                    correction_tip="Adjust framing to capture head-to-heel stance.",
                     annotation_type="none",
                 ))
         else:
@@ -615,13 +615,13 @@ class BatchSwingAnalyzer:
                 if addr_flex < config.DTL_SPINE_FLEXION_MIN_DEG:
                     criteria.append(FaultCriterion(
                         code="posture_loss",
-                        title="Tư thế Setup đứng quá thẳng",
+                        title="Upright Setup Posture",
                         status="error",
-                        measured_text=f"Cúi {addr_flex:.1f}°",
-                        standard_text=f"≥ {config.DTL_SPINE_FLEXION_MIN_DEG:.0f}°",
+                        measured_text=f"Flex {addr_flex:.1f}°",
+                        standard_text=f">= {config.DTL_SPINE_FLEXION_MIN_DEG:.0f}°",
                         frame_idx=address_idx,
-                        description=f"Góc cúi thân người lúc chuẩn bị chỉ đạt {addr_flex:.1f}°, khiến mặt phẳng vung gậy bị quá ngang.",
-                        correction_tip="Đẩy nhẹ hông ra sau và cúi thân người từ khớp hông khoảng 25° - 40° với lưng thẳng.",
+                        description=f"Forward hip hinge at address was only {addr_flex:.1f}°, creating an overly flat swing plane.",
+                        correction_tip="Hinge cleanly from the hips (25° - 40°) with a flat athletic spine.",
                         annotation_type="spine_tilt",
                         annotation_data={
                             "mid_hip": midpoint_2d(addr_2d["left_hip"], addr_2d["right_hip"]),
@@ -631,26 +631,26 @@ class BatchSwingAnalyzer:
                 elif loss > config.DTL_POSTURE_LOSS_MAX_DEG:
                     criteria.append(FaultCriterion(
                         code="posture_loss",
-                        title="Mất góc lưng / Nhổm người sớm (Early Extension)",
+                        title="Early Extension (Loss of Posture)",
                         status="error",
-                        measured_text=f"Mất góc {loss:.1f}°",
-                        standard_text=f"Lệch ≤ {config.DTL_POSTURE_LOSS_MAX_DEG:.0f}°",
+                        measured_text=f"Loss {loss:.1f}°",
+                        standard_text=f"<= {config.DTL_POSTURE_LOSS_MAX_DEG:.0f}°",
                         frame_idx=impact_idx,
-                        description=f"Khi chạm bóng bạn bị ngẩng thẳng lưng lên {loss:.1f}° so với lúc chuẩn bị, đẩy hông lao về phía bóng.",
-                        correction_tip="Giữ cảm giác mông chạm vào một bức tường tưởng tượng phía sau trong suốt pha Downswing.",
+                        description=f"Torso stood up by {loss:.1f}° from setup into impact, thrusting hips toward the ball.",
+                        correction_tip="Feel like your glutes stay against an imaginary wall behind you through impact.",
                         annotation_type="spine_tilt",
                         annotation_data={"mid_hip": imp_hip, "mid_shoulder": imp_sh},
                     ))
                 else:
                     criteria.append(FaultCriterion(
                         code="posture_loss",
-                        title="Duy trì góc cột sống (Posture Retention)",
+                        title="Spine Posture Retention",
                         status="passed",
-                        measured_text=f"Setup {addr_flex:.0f}° -> Impact {imp_flex:.0f}°",
-                        standard_text=f"Lệch ≤ {config.DTL_POSTURE_LOSS_MAX_DEG:.0f}°",
+                        measured_text=f"{addr_flex:.0f}° -> {imp_flex:.0f}°",
+                        standard_text=f"Delta <= {config.DTL_POSTURE_LOSS_MAX_DEG:.0f}°",
                         frame_idx=impact_idx,
-                        description="Duy trì góc cúi cột sống xuyên suốt từ Setup đến lúc chạm bóng cực kỳ ổn định.",
-                        correction_tip="Khả năng giữ tư thế lưng rất xuất sắc!",
+                        description="Maintained athletic forward spine angle solidly from setup through impact.",
+                        correction_tip="Outstanding posture retention through the hitting zone!",
                         annotation_type="spine_tilt",
                         annotation_data={"mid_hip": imp_hip, "mid_shoulder": imp_sh},
                     ))
@@ -674,13 +674,13 @@ class BatchSwingAnalyzer:
                 lm_k = lm_2d[min_k_idx]
                 criteria.append(FaultCriterion(
                     code="knee_stability",
-                    title="Chùng / Sụp đầu gối chân dẫn hướng",
+                    title="Lead Knee Collapse",
                     status="error",
                     measured_text=f"{min_k:.1f}° (3D)",
                     standard_text=f"{config.KNEE_MIN_ANGLE_3D:.0f}° - {config.KNEE_MAX_ANGLE_3D:.0f}°",
                     frame_idx=min_k_idx,
-                    description=f"Đầu gối chân trước bị sụp gập xuống quá sâu ({min_k:.1f}°), làm hạ thấp trọng tâm bất thường.",
-                    correction_tip="Giữ độ khuỵu gối vừa phải làm trụ vững khi xoay vai lên đỉnh.",
+                    description=f"Lead knee over-flexed to {min_k:.1f}° in 3D, dropping your center of gravity abnormally.",
+                    correction_tip="Maintain steady athletic knee flex as you coil into the top of the swing.",
                     annotation_type="knee_angle",
                     annotation_data={
                         "hip": lm_k[sk["lead_hip"]][:2],
@@ -692,13 +692,13 @@ class BatchSwingAnalyzer:
                 lm_k = lm_2d[max_k_idx]
                 criteria.append(FaultCriterion(
                     code="knee_stability",
-                    title="Bật thẳng đầu gối sớm (Early Extension)",
+                    title="Early Lead Knee Lockout",
                     status="error",
                     measured_text=f"{max_k:.1f}° (3D)",
-                    standard_text=f"≤ {config.KNEE_MAX_ANGLE_3D:.0f}°",
+                    standard_text=f"<= {config.KNEE_MAX_ANGLE_3D:.0f}°",
                     frame_idx=max_k_idx,
-                    description=f"Chân trước duỗi thẳng cứng quá sớm ({max_k:.1f}°) trước/tại lúc chạm bóng, làm người chơi bị nhổm dậy mất lực.",
-                    correction_tip="Giữ độ nén đàn hồi của đầu gối cho tới khoảnh khắc gậy chạm bóng.",
+                    description=f"Lead leg snapped straight early ({max_k:.1f}°) before/at impact, lifting torso out of posture.",
+                    correction_tip="Keep athletic spring in your lead knee until after the ball is struck.",
                     annotation_type="knee_angle",
                     annotation_data={
                         "hip": lm_k[sk["lead_hip"]][:2],
@@ -712,13 +712,13 @@ class BatchSwingAnalyzer:
                 k_val = knee_angles_3d[show_idx]
                 criteria.append(FaultCriterion(
                     code="knee_stability",
-                    title="Độ ổn định chân trụ & đầu gối",
+                    title="Lead Knee Stability",
                     status="passed",
                     measured_text=f"{k_val:.1f}° (3D)",
                     standard_text=f"{config.KNEE_MIN_ANGLE_3D:.0f}° - {config.KNEE_MAX_ANGLE_3D:.0f}°",
                     frame_idx=show_idx,
-                    description="Đầu gối giữ trụ đàn hồi rất chắc chắn, tạo bệ phóng lực vững vàng.",
-                    correction_tip="Tiếp tục duy trì trụ chân vững chãi như hiện tại.",
+                    description="Lead knee maintained solid athletic flex and ground leverage throughout the swing.",
+                    correction_tip="Continue anchoring your lower body with this balanced knee flex.",
                     annotation_type="knee_angle",
                     annotation_data={
                         "hip": lm_k[sk["lead_hip"]][:2],
@@ -729,13 +729,13 @@ class BatchSwingAnalyzer:
         else:
             criteria.append(FaultCriterion(
                 code="knee_stability",
-                title="Độ ổn định chân trụ & đầu gối",
+                title="Lead Knee Stability",
                 status="not_visible",
-                measured_text="Chưa thấy chân",
-                standard_text="Thấy hông, gối & mắt cá",
+                measured_text="Legs unclear",
+                standard_text="Hip, knee & ankle visible",
                 frame_idx=top_idx,
-                description="Chưa thấy rõ khớp gối và mắt cá chân trong khung hình.",
-                correction_tip="Đặt camera lấy toàn thân để kiểm tra chi tiết chân trụ.",
+                description="Knee and ankle landmarks were obscured or outside the frame.",
+                correction_tip="Frame full body from head to feet to enable leg diagnostics.",
                 annotation_type="none",
             ))
 

@@ -293,6 +293,23 @@ def build_app_stylesheet() -> str:
         color: {c.EMERALD_TEXT};
     }}
 
+    QPushButton#ExitBtn {{
+        background-color: {c.BG_SUBTLE};
+        color: {c.TEXT_MUTED};
+        border: 1px solid {c.BORDER_LIGHT};
+        border-radius: 12px;
+        min-width: 38px;
+        max-width: 38px;
+        min-height: 38px;
+        max-height: 38px;
+        padding: 0px;
+    }}
+    QPushButton#ExitBtn:hover {{
+        background-color: {c.CRIMSON_SOFT};
+        border-color: {c.CRIMSON_BORDER};
+        color: {c.CRIMSON};
+    }}
+
     /* === PROGRESS BAR === */
     QProgressBar {{
         background-color: {c.BG_MUTED};

@@ -1,7 +1,7 @@
 """
-GIAO DIỆN DESKTOP CHÍNH - VAR GOLF STUDIO (MODERN WHITE BENTO UI)
-Thiết kế sáng hiện đại, nền trắng tinh tế, bo góc mềm mại (14-22px),
-đổ bóng nhẹ, icon vector SVG và phân tích 2D + 3D chuẩn PGA/TPI.
+MAIN DESKTOP UI - VAR GOLF STUDIO (BORDERLESS FULLSCREEN WHITE BENTO UI)
+Clean white aesthetic, generous rounded cards, soft drop shadows, vector SVG icons,
+full English interface, and 2D + 3D PGA/TPI biomechanics diagnostics.
 """
 
 import copy
@@ -48,7 +48,7 @@ from src.utils.drawing import draw_skeleton_overlay, render_annotated_snapshot
 
 
 # ==============================
-# WORKER ĐỌC CAMERA ĐA LUỒNG
+# MULTI-THREADED CAMERA WORKER
 # ==============================
 class CameraWorker(QThread):
     frame_ready = Signal(object, float)  # (frame_bgr, timestamp_ms)
@@ -66,8 +66,8 @@ class CameraWorker(QThread):
 
         if not cap.isOpened():
             self.camera_error.emit(
-                f"Chưa tìm thấy Webcam (ID={self.camera_index}). "
-                "Cậu/bạn hãy kiểm tra cáp USB hoặc quyền Camera trong Windows Settings."
+                f"Unable to connect to Webcam (ID={self.camera_index}). "
+                "Please check the USB cable or Camera permissions in Windows Settings."
             )
             return
 
@@ -92,7 +92,7 @@ class CameraWorker(QThread):
 
 
 # ==============================
-# WORKER PHÂN TÍCH VIDEO AI
+# AI SWING ANALYSIS WORKER
 # ==============================
 class AnalysisWorker(QThread):
     progress_updated = Signal(int)
@@ -133,7 +133,7 @@ class AnalysisWorker(QThread):
 
 
 # ==============================
-# HÀM TIỆN ÍCH ẢNH & BO GÓC MỀM
+# IMAGE & MIRRORING HELPERS
 # ==============================
 def bgr_to_pixmap(frame_bgr: np.ndarray) -> QPixmap:
     rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
@@ -144,7 +144,7 @@ def bgr_to_pixmap(frame_bgr: np.ndarray) -> QPixmap:
 
 
 def round_pixmap(pix: QPixmap, radius: int = 16) -> QPixmap:
-    """Bo tròn 4 góc cho khung hình Video/Snapshot trên giao diện trắng."""
+    """Clip all 4 corners of a Video/Snapshot QPixmap cleanly."""
     if pix.isNull():
         return pix
     rounded = QPixmap(pix.size())
@@ -196,7 +196,7 @@ def mirror_criterion(criterion: FaultCriterion, width: int) -> FaultCriterion:
 
 
 # ==============================
-# THẺ HIỂN THỊ TỪNG LỖI (BENTO WHITE CARD)
+# DIAGNOSTIC CARD WIDGET
 # ==============================
 class FaultCardWidget(QFrame):
     clicked = Signal(object)
@@ -217,7 +217,7 @@ class FaultCardWidget(QFrame):
             accent = c.CRIMSON
             pill_bg = "#FEE2E2"
             pill_fg = c.CRIMSON_TEXT
-            pill_txt = "Cần sửa lỗi"
+            pill_txt = "Fault Detected"
             icon_name = "alert_triangle"
             card_bg = c.CRIMSON_SOFT if is_selected else c.BG_CARD
             border = f"2px solid {c.CRIMSON}" if is_selected else f"1px solid {c.BORDER_LIGHT}"
@@ -225,7 +225,7 @@ class FaultCardWidget(QFrame):
             accent = c.EMERALD
             pill_bg = "#D1FAE5"
             pill_fg = c.EMERALD_TEXT
-            pill_txt = "Đạt chuẩn"
+            pill_txt = "Pro Standard"
             icon_name = "check_circle"
             card_bg = c.EMERALD_SOFT if is_selected else c.BG_CARD
             border = f"2px solid {c.EMERALD}" if is_selected else f"1px solid {c.BORDER_LIGHT}"
@@ -233,7 +233,7 @@ class FaultCardWidget(QFrame):
             accent = c.AMBER
             pill_bg = "#FEF3C7"
             pill_fg = c.AMBER_TEXT
-            pill_txt = "Chưa rõ khớp"
+            pill_txt = "Not Visible"
             icon_name = "eye_off"
             card_bg = c.AMBER_SOFT if is_selected else c.BG_CARD
             border = f"2px solid {c.AMBER}" if is_selected else f"1px solid {c.BORDER_LIGHT}"
@@ -252,7 +252,7 @@ class FaultCardWidget(QFrame):
             """
         )
 
-        # Dòng 1: Pill trạng thái + Số đo dạng pill
+        # Row 1: Status Pill + Measured Telemetry
         top_row = QHBoxLayout()
         top_row.setSpacing(8)
 
@@ -290,7 +290,7 @@ class FaultCardWidget(QFrame):
         top_row.addWidget(metric, stretch=1)
         layout.addLayout(top_row)
 
-        # Dòng 2: Tên tiêu chí
+        # Row 2: Title
         title = QLabel(self.criterion.title)
         title.setWordWrap(True)
         title.setStyleSheet(
@@ -299,7 +299,7 @@ class FaultCardWidget(QFrame):
         )
         layout.addWidget(title)
 
-        # Dòng 3: Mô tả chi tiết
+        # Row 3: Explanation
         desc = QLabel(self.criterion.description)
         desc.setWordWrap(True)
         desc.setStyleSheet(
@@ -308,7 +308,7 @@ class FaultCardWidget(QFrame):
         )
         layout.addWidget(desc)
 
-        # Dòng 4: Hộp gợi ý sửa lỗi dịu mắt
+        # Row 4: Coaching Tip (only on error cards)
         if self.criterion.status == "error" and self.criterion.correction_tip:
             tip_box = QFrame()
             tip_box.setStyleSheet(
@@ -342,7 +342,7 @@ class FaultCardWidget(QFrame):
 
 
 # ==============================
-# CỬA SỔ CHÍNH ỨNG DỤNG
+# MAIN APPLICATION WINDOW
 # ==============================
 class GolfAssistantWindow(QMainWindow):
     STATE_LIVE = "LIVE"
@@ -356,18 +356,18 @@ class GolfAssistantWindow(QMainWindow):
         self.camera_index = camera_index
         self.state = self.STATE_LIVE
 
-        # Dữ liệu phiên quay & phân tích
+        # Recording & analysis session state
         self.raw_recorded_frames: list[np.ndarray] = []
         self.raw_recorded_timestamps: list[float] = []
         self.analysis_result: SwingAnalysisResult | None = None
         self.selected_criterion: FaultCriterion | None = None
 
-        # Tham số đếm ngược & ghi hình
+        # Countdown & recording timers
         self.countdown_remaining = config.COUNTDOWN_SECONDS
         self.record_duration_sec = config.RECORD_SECONDS
         self.record_start_time = 0.0
 
-        # Trạng thái phát video Slow-Motion
+        # Slow-motion replay state
         self.replay_playing = False
         self.replay_frame_idx = 0
         self.replay_speed = 0.5
@@ -377,17 +377,18 @@ class GolfAssistantWindow(QMainWindow):
         self._start_camera()
 
     def _init_ui(self):
-        self.setWindowTitle("VAR Golf Studio - Trợ Lý AI Phân Tích Tư Thế Golf")
-        self.resize(1340, 860)
-        self.setMinimumSize(1020, 690)
+        self.setWindowTitle("VAR Golf Studio - AI Golf Swing Analyzer")
+        # Borderless Fullscreen (zero OS chrome/titlebar/window frame)
+        self.setWindowFlags(Qt.Window | Qt.FramelessWindowHint)
+        self.resize(1366, 768)
         self.setStyleSheet(build_app_stylesheet())
 
         central = QWidget()
         central.setObjectName("RootCanvas")
         self.setCentralWidget(central)
         root_layout = QVBoxLayout(central)
-        root_layout.setContentsMargins(18, 16, 18, 18)
-        root_layout.setSpacing(14)
+        root_layout.setContentsMargins(14, 12, 14, 14)
+        root_layout.setSpacing(12)
 
         # 1. FLOATING WHITE TOP BAR
         root_layout.addWidget(self._build_top_bar())
@@ -401,17 +402,17 @@ class GolfAssistantWindow(QMainWindow):
     def _build_top_bar(self) -> QFrame:
         bar = QFrame()
         bar.setObjectName("TopBar")
-        bar.setFixedHeight(66)
+        bar.setFixedHeight(64)
         apply_soft_shadow(bar, blur=20, y_offset=4, alpha=16)
 
         layout = QHBoxLayout(bar)
-        layout.setContentsMargins(16, 10, 16, 10)
+        layout.setContentsMargins(16, 10, 14, 10)
         layout.setSpacing(12)
 
         # Rounded Logo Box
         icon_box = QFrame()
         icon_box.setObjectName("BrandIconBox")
-        icon_box.setFixedSize(42, 42)
+        icon_box.setFixedSize(40, 40)
         ib_layout = QHBoxLayout(icon_box)
         ib_layout.setContentsMargins(0, 0, 0, 0)
         ib_layout.setAlignment(Qt.AlignCenter)
@@ -424,12 +425,12 @@ class GolfAssistantWindow(QMainWindow):
         brand_col.setSpacing(1)
         title = QLabel("VAR Golf Studio")
         title.setObjectName("BrandTitle")
-        subtitle = QLabel("Phân tích cơ sinh học 2D + 3D chuẩn PGA/TPI")
+        subtitle = QLabel("2D + 3D PGA / TPI Biomechanics Analyzer")
         subtitle.setObjectName("BrandSubtitle")
         brand_col.addWidget(title)
         brand_col.addWidget(subtitle)
 
-        self.lbl_status_pill = QLabel("Sẵn sàng")
+        self.lbl_status_pill = QLabel("Ready")
         self.lbl_status_pill.setObjectName("StatusPill")
 
         layout.addWidget(icon_box)
@@ -439,25 +440,34 @@ class GolfAssistantWindow(QMainWindow):
         layout.addStretch()
 
         # Handedness
-        lbl_hand = QLabel("Tay thuận")
+        lbl_hand = QLabel("Handedness")
         lbl_hand.setObjectName("TopControlLabel")
         self.combo_handedness = QComboBox()
-        self.combo_handedness.addItem("Thuận tay phải", "right")
-        self.combo_handedness.addItem("Thuận tay trái", "left")
+        self.combo_handedness.addItem("Right-Handed", "right")
+        self.combo_handedness.addItem("Left-Handed", "left")
 
         # Duration
-        lbl_dur = QLabel("Thời lượng")
+        lbl_dur = QLabel("Duration")
         lbl_dur.setObjectName("TopControlLabel")
         self.combo_duration = QComboBox()
-        self.combo_duration.addItem("10 giây (Khuyên dùng)", 10)
-        self.combo_duration.addItem("8 giây", 8)
-        self.combo_duration.addItem("12 giây", 12)
-        self.combo_duration.addItem("5 giây (Thử nhanh)", 5)
+        self.combo_duration.addItem("10s (Recommended)", 10)
+        self.combo_duration.addItem("8s", 8)
+        self.combo_duration.addItem("12s", 12)
+        self.combo_duration.addItem("5s (Quick Test)", 5)
         self.combo_duration.currentIndexChanged.connect(self._on_duration_changed)
 
         # Mirror
-        self.chk_mirror = QCheckBox("Soi gương")
+        self.chk_mirror = QCheckBox("Mirror View")
         self.chk_mirror.setChecked(True)
+
+        # Close button (since window is borderless fullscreen)
+        self.btn_exit = QPushButton()
+        self.btn_exit.setObjectName("ExitBtn")
+        self.btn_exit.setIcon(svg_icon("x_close", color=COLORS.TEXT_MUTED, size=17))
+        self.btn_exit.setIconSize(QSize(17, 17))
+        self.btn_exit.setToolTip("Exit Application [Ctrl+Q]")
+        self.btn_exit.setCursor(Qt.PointingHandCursor)
+        self.btn_exit.clicked.connect(self.close)
 
         layout.addWidget(lbl_hand)
         layout.addWidget(self.combo_handedness)
@@ -466,22 +476,24 @@ class GolfAssistantWindow(QMainWindow):
         layout.addWidget(self.combo_duration)
         layout.addSpacing(4)
         layout.addWidget(self.chk_mirror)
+        layout.addSpacing(4)
+        layout.addWidget(self.btn_exit)
         return bar
 
     def _build_live_page(self) -> QWidget:
         page = QWidget()
         layout = QVBoxLayout(page)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(14)
+        layout.setSpacing(12)
 
-        # Thẻ trắng nổi chứa khung Video
+        # White Rounded Stage Card
         stage = QFrame()
         stage.setObjectName("StageCard")
         apply_soft_shadow(stage, blur=26, y_offset=6, alpha=18)
         stage_layout = QVBoxLayout(stage)
-        stage_layout.setContentsMargins(12, 12, 12, 12)
+        stage_layout.setContentsMargins(10, 10, 10, 10)
 
-        self.live_viewer = QLabel("Đang kết nối tín hiệu Camera...")
+        self.live_viewer = QLabel("Initializing Camera Feed...")
         self.live_viewer.setAlignment(Qt.AlignCenter)
         self.live_viewer.setStyleSheet(
             f"background-color: {COLORS.BG_SUBTLE}; border-radius: 16px; "
@@ -489,7 +501,7 @@ class GolfAssistantWindow(QMainWindow):
             f"color: {COLORS.TEXT_MUTED}; font-size: 15px; font-weight: 600;"
         )
         self.live_viewer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.live_viewer.setMinimumHeight(460)
+        self.live_viewer.setMinimumHeight(440)
         stage_layout.addWidget(self.live_viewer)
         layout.addWidget(stage, stretch=1)
 
@@ -498,13 +510,13 @@ class GolfAssistantWindow(QMainWindow):
         dock.setObjectName("ControlDock")
         apply_soft_shadow(dock, blur=20, y_offset=4, alpha=14)
         dock_layout = QHBoxLayout(dock)
-        dock_layout.setContentsMargins(20, 14, 20, 14)
+        dock_layout.setContentsMargins(20, 12, 20, 12)
         dock_layout.setSpacing(16)
 
         left_info = QVBoxLayout()
         left_info.setSpacing(6)
         self.lbl_live_status = QLabel(
-            "Đứng toàn thân trong khung ngắm (góc chính diện hoặc nhìn ngang đều được AI tự nhận diện)."
+            "Stand full-body inside the frame (Face-On or Down-the-Line angle is auto-detected)."
         )
         self.lbl_live_status.setObjectName("LiveHintLabel")
         self.lbl_live_status.setWordWrap(True)
@@ -520,14 +532,14 @@ class GolfAssistantWindow(QMainWindow):
         dock_layout.addLayout(left_info, stretch=1)
 
         # Buttons
-        self.btn_start = QPushButton(" Bắt đầu quay & Phân tích [SPACE]")
+        self.btn_start = QPushButton(" Start Recording & Analyze [SPACE]")
         self.btn_start.setObjectName("PrimaryCTA")
         self.btn_start.setIcon(svg_icon("play", color="#FFFFFF", size=17))
         self.btn_start.setIconSize(QSize(17, 17))
         self.btn_start.setCursor(Qt.PointingHandCursor)
         self.btn_start.clicked.connect(self._on_start_clicked)
 
-        self.btn_stop_early = QPushButton(" Dừng sớm & Phân tích ngay")
+        self.btn_stop_early = QPushButton(" Stop Early & Analyze Now")
         self.btn_stop_early.setObjectName("DangerCTA")
         self.btn_stop_early.setIcon(svg_icon("stop", color="#FFFFFF", size=15))
         self.btn_stop_early.setIconSize(QSize(15, 15))
@@ -535,7 +547,7 @@ class GolfAssistantWindow(QMainWindow):
         self.btn_stop_early.setVisible(False)
         self.btn_stop_early.clicked.connect(self._finish_recording_and_analyze)
 
-        self.btn_cancel = QPushButton(" Hủy [ESC]")
+        self.btn_cancel = QPushButton(" Cancel [ESC]")
         self.btn_cancel.setObjectName("SecondaryBtn")
         self.btn_cancel.setIcon(svg_icon("x_close", color=COLORS.TEXT_PRIMARY, size=15))
         self.btn_cancel.setIconSize(QSize(15, 15))
@@ -553,11 +565,11 @@ class GolfAssistantWindow(QMainWindow):
         page = QWidget()
         main_split = QHBoxLayout(page)
         main_split.setContentsMargins(0, 0, 0, 0)
-        main_split.setSpacing(16)
+        main_split.setSpacing(14)
 
         # === LEFT STAGE: SNAPSHOT & SLOW-MOTION ===
         left_col = QVBoxLayout()
-        left_col.setSpacing(12)
+        left_col.setSpacing(10)
 
         # Segmented Switcher Pill + Camera View Badge
         top_strip = QHBoxLayout()
@@ -569,13 +581,13 @@ class GolfAssistantWindow(QMainWindow):
         seg_layout.setContentsMargins(4, 4, 4, 4)
         seg_layout.setSpacing(4)
 
-        self.btn_tab_snapshot = QPushButton(" Ảnh khoanh vùng lỗi")
+        self.btn_tab_snapshot = QPushButton(" Fault Snapshot")
         self.btn_tab_snapshot.setObjectName("SegmentBtn")
         self.btn_tab_snapshot.setIcon(svg_icon("image", color=COLORS.EMERALD_TEXT, size=16))
         self.btn_tab_snapshot.setCursor(Qt.PointingHandCursor)
         self.btn_tab_snapshot.clicked.connect(lambda: self._switch_result_tab(0))
 
-        self.btn_tab_replay = QPushButton(" Xem lại Slow-Motion")
+        self.btn_tab_replay = QPushButton(" Slow-Motion Replay")
         self.btn_tab_replay.setObjectName("SegmentBtn")
         self.btn_tab_replay.setIcon(svg_icon("video", color=COLORS.TEXT_MUTED, size=16))
         self.btn_tab_replay.setCursor(Qt.PointingHandCursor)
@@ -584,7 +596,7 @@ class GolfAssistantWindow(QMainWindow):
         seg_layout.addWidget(self.btn_tab_snapshot)
         seg_layout.addWidget(self.btn_tab_replay)
 
-        self.lbl_view_badge = QLabel("Góc quay: Chính diện (Face-On)")
+        self.lbl_view_badge = QLabel("Camera: Face-On View")
         self.lbl_view_badge.setObjectName("ViewBadge")
 
         top_strip.addWidget(seg_track)
@@ -597,7 +609,7 @@ class GolfAssistantWindow(QMainWindow):
         stage.setObjectName("StageCard")
         apply_soft_shadow(stage, blur=26, y_offset=6, alpha=18)
         stage_layout = QVBoxLayout(stage)
-        stage_layout.setContentsMargins(12, 12, 12, 12)
+        stage_layout.setContentsMargins(10, 10, 10, 10)
 
         self.result_viewer = QLabel()
         self.result_viewer.setAlignment(Qt.AlignCenter)
@@ -621,16 +633,16 @@ class GolfAssistantWindow(QMainWindow):
         snap_ctrl.setContentsMargins(16, 10, 16, 10)
         snap_ctrl.setSpacing(8)
 
-        self.lbl_snap_info = QLabel("Đang soi tư thế...")
+        self.lbl_snap_info = QLabel("Inspecting swing posture...")
         self.lbl_snap_info.setStyleSheet(
             f"color: {COLORS.TEXT_SECONDARY}; font-size: 12px; font-weight: 600;"
         )
         snap_ctrl.addWidget(self.lbl_snap_info, stretch=1)
 
-        self.btn_jump_addr = QPushButton("Chuẩn bị")
-        self.btn_jump_top = QPushButton("Đỉnh Swing")
-        self.btn_jump_imp = QPushButton("Chạm bóng")
-        self.btn_jump_fin = QPushButton("Kết thúc")
+        self.btn_jump_addr = QPushButton("Address")
+        self.btn_jump_top = QPushButton("Top")
+        self.btn_jump_imp = QPushButton("Impact")
+        self.btn_jump_fin = QPushButton("Finish")
         for btn, phase_key in (
             (self.btn_jump_addr, "address"),
             (self.btn_jump_top, "top"),
@@ -650,7 +662,7 @@ class GolfAssistantWindow(QMainWindow):
         replay_ctrl.setContentsMargins(16, 10, 16, 10)
         replay_ctrl.setSpacing(10)
 
-        self.btn_play_pause = QPushButton(" Phát")
+        self.btn_play_pause = QPushButton(" Play")
         self.btn_play_pause.setObjectName("SecondaryBtn")
         self.btn_play_pause.setIcon(svg_icon("play", color=COLORS.TEXT_PRIMARY, size=15))
         self.btn_play_pause.setCursor(Qt.PointingHandCursor)
@@ -664,9 +676,9 @@ class GolfAssistantWindow(QMainWindow):
         self.lbl_replay_time.setObjectName("MetricValue")
 
         self.combo_speed = QComboBox()
-        self.combo_speed.addItem("0.25x Siêu chậm", 0.25)
-        self.combo_speed.addItem("0.50x Chậm", 0.5)
-        self.combo_speed.addItem("1.00x Thực", 1.0)
+        self.combo_speed.addItem("0.25x Ultra Slow", 0.25)
+        self.combo_speed.addItem("0.50x Slow", 0.5)
+        self.combo_speed.addItem("1.00x Normal", 1.0)
         self.combo_speed.setCurrentIndex(1)
         self.combo_speed.currentIndexChanged.connect(self._on_speed_changed)
 
@@ -679,13 +691,13 @@ class GolfAssistantWindow(QMainWindow):
         self.result_controls_stack.addWidget(replay_dock)
         left_col.addWidget(self.result_controls_stack)
 
-        main_split.addLayout(left_col, stretch=62)
+        main_split.addLayout(left_col, stretch=63)
 
         # === RIGHT PANEL: WHITE ROUNDED BIOMECHANICS PANEL ===
         right_panel = QFrame()
         right_panel.setObjectName("RightPanel")
         right_panel.setMinimumWidth(400)
-        right_panel.setMaximumWidth(480)
+        right_panel.setMaximumWidth(490)
         apply_soft_shadow(right_panel, blur=26, y_offset=6, alpha=18)
 
         right_col = QVBoxLayout(right_panel)
@@ -694,9 +706,9 @@ class GolfAssistantWindow(QMainWindow):
 
         # Header row
         diag_header = QHBoxLayout()
-        lbl_diag = QLabel("CHẨN ĐOÁN TƯ THẾ GOLF")
+        lbl_diag = QLabel("SWING BIOMECHANICS")
         lbl_diag.setObjectName("SectionHeading")
-        self.lbl_score_pill = QLabel("Đạt 0/0")
+        self.lbl_score_pill = QLabel("Passed 0/0")
         self.lbl_score_pill.setObjectName("ScorePill")
         diag_header.addWidget(lbl_diag)
         diag_header.addStretch()
@@ -711,7 +723,7 @@ class GolfAssistantWindow(QMainWindow):
         self.lbl_summary_icon = QLabel()
         self.lbl_summary_icon.setFixedSize(22, 22)
         self.lbl_summary_icon.setStyleSheet("background: transparent; border: none;")
-        self.lbl_summary_banner = QLabel("Đang tổng hợp...")
+        self.lbl_summary_banner = QLabel("Summarizing...")
         self.lbl_summary_banner.setWordWrap(True)
         self.lbl_summary_banner.setStyleSheet(
             "font-size: 13px; font-weight: 800; background: transparent; border: none;"
@@ -720,12 +732,11 @@ class GolfAssistantWindow(QMainWindow):
         sum_layout.addWidget(self.lbl_summary_banner, stretch=1)
         right_col.addWidget(self.summary_box)
 
-        lbl_hint_card = QLabel("Nhấn vào từng thẻ để khoanh vùng vị trí lỗi trên ảnh:")
+        lbl_hint_card = QLabel("Select any criterion card to highlight the joint zone on frame:")
         lbl_hint_card.setWordWrap(True)
         lbl_hint_card.setStyleSheet(f"color: {COLORS.TEXT_MUTED}; font-size: 12px;")
         right_col.addWidget(lbl_hint_card)
 
-        # Scrollable Cards Container (ràng buộc chiều rộng theo viewport để card không bị tràn mép)
         class _FittedScrollArea(QScrollArea):
             def resizeEvent(self, ev):
                 super().resizeEvent(ev)
@@ -745,7 +756,7 @@ class GolfAssistantWindow(QMainWindow):
         right_col.addWidget(scroll, stretch=1)
 
         # Retry CTA
-        self.btn_retry = QPushButton(" Đánh cú mới [R]")
+        self.btn_retry = QPushButton(" New Swing [R]")
         self.btn_retry.setObjectName("PrimaryCTA")
         self.btn_retry.setIcon(svg_icon("rotate_ccw", color="#FFFFFF", size=17))
         self.btn_retry.setIconSize(QSize(17, 17))
@@ -753,7 +764,7 @@ class GolfAssistantWindow(QMainWindow):
         self.btn_retry.clicked.connect(self._restart_to_live)
         right_col.addWidget(self.btn_retry)
 
-        main_split.addWidget(right_panel, stretch=38)
+        main_split.addWidget(right_panel, stretch=37)
         return page
 
     # --- TIMERS & SHORTCUTS ---
@@ -768,6 +779,14 @@ class GolfAssistantWindow(QMainWindow):
         QShortcut(QKeySequence(Qt.Key_Space), self).activated.connect(self._on_space_shortcut)
         QShortcut(QKeySequence(Qt.Key_Escape), self).activated.connect(self._on_cancel_clicked)
         QShortcut(QKeySequence("R"), self).activated.connect(self._on_retry_shortcut)
+        QShortcut(QKeySequence(Qt.Key_F11), self).activated.connect(self._toggle_fullscreen)
+        QShortcut(QKeySequence("Ctrl+Q"), self).activated.connect(self.close)
+
+    def _toggle_fullscreen(self):
+        if self.isFullScreen():
+            self.showNormal()
+        else:
+            self.showFullScreen()
 
     def _on_space_shortcut(self):
         if self.state == self.STATE_LIVE:
@@ -796,14 +815,14 @@ class GolfAssistantWindow(QMainWindow):
         self.cam_worker.start()
 
     def _on_camera_error(self, msg: str):
-        self.live_viewer.setText(f"Chưa kết nối được Camera\n\n{msg}")
+        self.live_viewer.setText(f"Camera Offline\n\n{msg}")
         self.live_viewer.setStyleSheet(
             f"background-color: {COLORS.CRIMSON_SOFT}; border-radius: 16px; "
             f"border: 1px dashed {COLORS.CRIMSON_BORDER}; "
             f"color: {COLORS.CRIMSON_TEXT}; font-size: 14px; font-weight: 600;"
         )
         self.btn_start.setEnabled(False)
-        self._set_status_pill("Mất kết nối Camera", COLORS.CRIMSON_TEXT, COLORS.CRIMSON_SOFT, COLORS.CRIMSON_BORDER)
+        self._set_status_pill("Camera Offline", COLORS.CRIMSON_TEXT, COLORS.CRIMSON_SOFT, COLORS.CRIMSON_BORDER)
 
     def _on_duration_changed(self):
         self.record_duration_sec = int(self.combo_duration.currentData())
@@ -819,7 +838,7 @@ class GolfAssistantWindow(QMainWindow):
             elapsed = time.perf_counter() - self.record_start_time
             remaining = max(0.0, self.record_duration_sec - elapsed)
             self.lbl_live_status.setText(
-                f"Đang ghi hình cú đánh Golf... Còn {remaining:.1f} giây (Nhấn SPACE để phân tích sớm)"
+                f"Recording Golf Swing... {remaining:.1f}s remaining (Press SPACE to analyze early)"
             )
             if elapsed >= self.record_duration_sec:
                 self._finish_recording_and_analyze()
@@ -862,7 +881,6 @@ class GolfAssistantWindow(QMainWindow):
 
             cx, cy = w // 2, h // 2 - 14
             r = 68
-            # Vòng tròn trắng mờ làm nền số đếm ngược
             painter.setBrush(QColor(255, 255, 255, 235))
             painter.setPen(Qt.NoPen)
             painter.drawEllipse(cx - r, cy - r, r * 2, r * 2)
@@ -885,15 +903,14 @@ class GolfAssistantWindow(QMainWindow):
             painter.setFont(QFont("Consolas", 56, QFont.Bold))
             painter.drawText(cx - 55, cy - 48, 110, 96, Qt.AlignCenter, str(self.countdown_remaining))
 
-            # Pill hướng dẫn dưới vòng tròn
             painter.setBrush(QColor(255, 255, 255, 235))
             painter.setPen(Qt.NoPen)
-            pill_w = min(380, w - 40)
+            pill_w = min(360, w - 40)
             painter.drawRoundedRect((w - pill_w) // 2, cy + 84, pill_w, 38, 19, 19)
             painter.setPen(QColor(COLORS.TEXT_PRIMARY))
             painter.setFont(QFont("Segoe UI", 12, QFont.Bold))
             painter.drawText(
-                (w - pill_w) // 2, cy + 84, pill_w, 38, Qt.AlignCenter, "Vào tư thế chuẩn bị đánh (Address)"
+                (w - pill_w) // 2, cy + 84, pill_w, 38, Qt.AlignCenter, "GET INTO ADDRESS POSTURE"
             )
 
         elif self.state == self.STATE_RECORDING:
@@ -901,7 +918,6 @@ class GolfAssistantWindow(QMainWindow):
             remaining = max(0.0, self.record_duration_sec - elapsed)
             ratio = min(1.0, elapsed / max(0.1, float(self.record_duration_sec)))
 
-            # Glassmorphic white REC pill
             painter.setBrush(QColor(255, 255, 255, 235))
             painter.setPen(QPen(QColor(COLORS.CRIMSON_BORDER), 1.5))
             painter.drawRoundedRect(26, 26, 172, 36, 18, 18)
@@ -914,7 +930,6 @@ class GolfAssistantWindow(QMainWindow):
             painter.setFont(QFont("Consolas", 13, QFont.Bold))
             painter.drawText(58, 26, 134, 36, Qt.AlignVCenter | Qt.AlignLeft, f"REC  {remaining:04.1f}s")
 
-            # Bottom progress bar
             bar_w = int((w - 52) * ratio)
             painter.setBrush(QColor(255, 255, 255, 160))
             painter.drawRoundedRect(26, h - 22, w - 52, 6, 3, 3)
@@ -939,24 +954,24 @@ class GolfAssistantWindow(QMainWindow):
         self.combo_duration.setEnabled(False)
 
         self._set_status_pill(
-            f"Chuẩn bị {self.countdown_remaining}s",
+            f"Countdown {self.countdown_remaining}s",
             COLORS.AMBER_TEXT,
             COLORS.AMBER_SOFT,
             COLORS.AMBER_BORDER,
         )
-        self.lbl_live_status.setText(f"Chuẩn bị đánh... Bắt đầu quay sau {self.countdown_remaining} giây!")
+        self.lbl_live_status.setText(f"Get ready... Recording starts in {self.countdown_remaining} seconds!")
         self.countdown_timer.start()
 
     def _on_countdown_tick(self):
         self.countdown_remaining -= 1
         if self.countdown_remaining > 0:
             self._set_status_pill(
-                f"Chuẩn bị {self.countdown_remaining}s",
+                f"Countdown {self.countdown_remaining}s",
                 COLORS.AMBER_TEXT,
                 COLORS.AMBER_SOFT,
                 COLORS.AMBER_BORDER,
             )
-            self.lbl_live_status.setText(f"Chuẩn bị đánh... Bắt đầu quay sau {self.countdown_remaining} giây!")
+            self.lbl_live_status.setText(f"Get ready... Recording starts in {self.countdown_remaining} seconds!")
         else:
             self.countdown_timer.stop()
             self._begin_recording()
@@ -967,8 +982,8 @@ class GolfAssistantWindow(QMainWindow):
         self.record_start_time = time.perf_counter()
         self.state = self.STATE_RECORDING
         self.btn_stop_early.setVisible(True)
-        self._set_status_pill("Đang ghi hình", COLORS.CRIMSON_TEXT, COLORS.CRIMSON_SOFT, COLORS.CRIMSON_BORDER)
-        self.lbl_live_status.setText("ĐANG QUAY! Hãy thực hiện cú đánh Golf tự nhiên...")
+        self._set_status_pill("Recording", COLORS.CRIMSON_TEXT, COLORS.CRIMSON_SOFT, COLORS.CRIMSON_BORDER)
+        self.lbl_live_status.setText("RECORDING! Perform your natural golf swing...")
 
     def _on_cancel_clicked(self):
         if self.state in (self.STATE_COUNTDOWN, self.STATE_RECORDING):
@@ -989,9 +1004,9 @@ class GolfAssistantWindow(QMainWindow):
         self.progress_bar.setValue(0)
         self.combo_handedness.setEnabled(True)
         self.combo_duration.setEnabled(True)
-        self._set_status_pill("Sẵn sàng", COLORS.EMERALD_TEXT, COLORS.EMERALD_SOFT, COLORS.EMERALD_BORDER)
+        self._set_status_pill("Ready", COLORS.EMERALD_TEXT, COLORS.EMERALD_SOFT, COLORS.EMERALD_BORDER)
         self.lbl_live_status.setText(
-            "Đứng toàn thân trong khung ngắm (góc chính diện hoặc nhìn ngang đều được AI tự nhận diện)."
+            "Stand full-body inside the frame (Face-On or Down-the-Line angle is auto-detected)."
         )
 
     def _finish_recording_and_analyze(self):
@@ -1002,9 +1017,9 @@ class GolfAssistantWindow(QMainWindow):
         self.btn_cancel.setVisible(False)
         self.progress_bar.setVisible(True)
         self.progress_bar.setValue(0)
-        self._set_status_pill("Đang phân tích", COLORS.BLUE_TEXT, COLORS.BLUE_SOFT, COLORS.BLUE_BORDER)
+        self._set_status_pill("Analyzing", COLORS.BLUE_TEXT, COLORS.BLUE_SOFT, COLORS.BLUE_BORDER)
         self.lbl_live_status.setText(
-            f"AI đang dựng khung xương 2D+3D và chấm điểm tư thế ({len(self.raw_recorded_frames)} khung hình)..."
+            f"Running 2D + 3D AI pose tracking & biomechanics scoring ({len(self.raw_recorded_frames)} frames)..."
         )
 
         handedness = self.combo_handedness.currentData()
@@ -1017,7 +1032,7 @@ class GolfAssistantWindow(QMainWindow):
         self.analysis_worker.start()
 
     def _on_analysis_failed(self, err: str):
-        QMessageBox.critical(self, "Lỗi Phân Tích AI", f"Đã xảy ra lỗi khi phân tích:\n{err}")
+        QMessageBox.critical(self, "AI Analysis Error", f"An error occurred during swing analysis:\n{err}")
         self.state = self.STATE_LIVE
         self._reset_live_controls()
 
@@ -1026,16 +1041,16 @@ class GolfAssistantWindow(QMainWindow):
         if not result.person_detected or not result.criteria:
             QMessageBox.information(
                 self,
-                "Không nhận diện rõ người chơi",
-                "AI không thấy rõ toàn thân người chơi trong đoạn video vừa quay.\n"
-                "Hãy đảm bảo đủ ánh sáng và đứng lùi để thấy từ đầu tới chân nhé ạ!",
+                "Player Not Detected",
+                "AI could not clearly track your full body in the recorded clip.\n"
+                "Please ensure good lighting and stand far enough back to frame head to toe.",
             )
             self.state = self.STATE_LIVE
             self._reset_live_controls()
             return
 
         self.state = self.STATE_RESULT
-        self._set_status_pill("Hoàn tất phân tích", COLORS.EMERALD_TEXT, COLORS.EMERALD_SOFT, COLORS.EMERALD_BORDER)
+        self._set_status_pill("Analysis Complete", COLORS.EMERALD_TEXT, COLORS.EMERALD_SOFT, COLORS.EMERALD_BORDER)
         self.stacked.setCurrentIndex(1)
         self._populate_result_ui()
         QTimer.singleShot(0, self._refresh_active_result_view)
@@ -1054,17 +1069,18 @@ class GolfAssistantWindow(QMainWindow):
         errors = [c for c in res.criteria if c.status == "error"]
 
         view_txt = (
-            "Góc quay: Chính diện (Face-On)"
+            "Camera: Face-On View"
             if res.camera_view == "face_on"
-            else "Góc quay: Nhìn ngang (Down-the-Line)"
+            else "Camera: Down-the-Line (DTL)"
         )
         self.lbl_view_badge.setText(view_txt)
-        self.lbl_score_pill.setText(f"Đạt {res.score_passed}/{res.score_evaluated}")
+        self.lbl_score_pill.setText(f"Passed {res.score_passed}/{res.score_evaluated}")
 
         if errors:
             self.lbl_summary_icon.setPixmap(svg_pixmap("alert_triangle", color=COLORS.CRIMSON, size=20))
+            noun = "Swing Fault" if len(errors) == 1 else "Swing Faults"
             self.lbl_summary_banner.setText(
-                f"Phát hiện {len(errors)} lỗi kỹ thuật  (Đạt {res.score_passed}/{res.score_evaluated})"
+                f"{len(errors)} {noun} Detected  (Passed {res.score_passed}/{res.score_evaluated})"
             )
             self.lbl_summary_banner.setStyleSheet(
                 f"color: {COLORS.CRIMSON_TEXT}; font-size: 13px; font-weight: 800; background: transparent; border: none;"
@@ -1075,7 +1091,7 @@ class GolfAssistantWindow(QMainWindow):
         else:
             self.lbl_summary_icon.setPixmap(svg_pixmap("check_circle", color=COLORS.EMERALD, size=20))
             self.lbl_summary_banner.setText(
-                f"Xuất sắc! Đạt chuẩn {res.score_passed}/{res.score_evaluated} tiêu chí"
+                f"Excellent! Passed All {res.score_passed}/{res.score_evaluated} Criteria"
             )
             self.lbl_summary_banner.setStyleSheet(
                 f"color: {COLORS.EMERALD_TEXT}; font-size: 13px; font-weight: 800; background: transparent; border: none;"
@@ -1145,14 +1161,14 @@ class GolfAssistantWindow(QMainWindow):
     def _get_phase_label(self, frame_idx: int) -> str:
         res = self.analysis_result
         if abs(frame_idx - res.address_idx) <= 3:
-            return f"CHUẨN BỊ | Frame {frame_idx}/{res.total_frames}"
+            return f"ADDRESS | Frame {frame_idx}/{res.total_frames}"
         if abs(frame_idx - res.top_idx) <= 2:
-            return f"ĐỈNH SWING | Frame {frame_idx}/{res.total_frames}"
+            return f"TOP OF SWING | Frame {frame_idx}/{res.total_frames}"
         if abs(frame_idx - res.impact_idx) <= 2:
-            return f"CHẠM BÓNG | Frame {frame_idx}/{res.total_frames}"
+            return f"IMPACT | Frame {frame_idx}/{res.total_frames}"
         if abs(frame_idx - res.finish_idx) <= 3:
-            return f"KẾT THÚC | Frame {frame_idx}/{res.total_frames}"
-        return f"KHOẢNH KHẮC LỖI | Frame {frame_idx}/{res.total_frames}"
+            return f"FINISH | Frame {frame_idx}/{res.total_frames}"
+        return f"FAULT MOMENT | Frame {frame_idx}/{res.total_frames}"
 
     def _render_selected_snapshot(self, override_frame_idx: int | None = None):
         if not self.analysis_result or not self.selected_criterion:
@@ -1182,7 +1198,7 @@ class GolfAssistantWindow(QMainWindow):
         if not self.result_viewer.size().isEmpty():
             pix = pix.scaled(self.result_viewer.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation)
         self.result_viewer.setPixmap(round_pixmap(pix, radius=16))
-        self.lbl_snap_info.setText(f"Đang soi: {crit.title} ({phase_txt})")
+        self.lbl_snap_info.setText(f"Inspecting: {crit.title} ({phase_txt})")
 
     def _show_phase_snapshot(self, phase: str):
         if not self.analysis_result:
@@ -1199,10 +1215,10 @@ class GolfAssistantWindow(QMainWindow):
     # --- SLOW MOTION REPLAY ---
     def _update_play_pause_button(self):
         if self.replay_playing:
-            self.btn_play_pause.setText(" Tạm dừng")
+            self.btn_play_pause.setText(" Pause")
             self.btn_play_pause.setIcon(svg_icon("pause", color=COLORS.TEXT_PRIMARY, size=15))
         else:
-            self.btn_play_pause.setText(" Phát")
+            self.btn_play_pause.setText(" Play")
             self.btn_play_pause.setIcon(svg_icon("play", color=COLORS.TEXT_PRIMARY, size=15))
 
     def _on_speed_changed(self):

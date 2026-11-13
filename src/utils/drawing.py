@@ -113,7 +113,7 @@ def draw_skeleton_overlay(frame_bgr, lm_dict: dict | None, arm_angle: float = 0.
         is_bad = arm_angle < config.LEAD_ARM_MIN_ANGLE_3D
         box_fill = (153, 27, 27, 220) if is_bad else (6, 95, 70, 220)
         border = (239, 68, 68, 255) if is_bad else (16, 185, 129, 255)
-        text = f"Góc tay 3D: {arm_angle:.1f}° | {'GẬP TAY' if is_bad else 'THẲNG CHUẨN'}"
+        text = f"3D Lead Arm: {arm_angle:.1f}° | {'BENT ARM' if is_bad else 'STRAIGHT OK'}"
         bbox = draw.textbbox((0, 0), text, font=font)
         tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
         draw.rounded_rectangle([(14, 14), (14 + tw + 26, 14 + th + 16)], radius=8, fill=box_fill, outline=border, width=2)
@@ -201,11 +201,11 @@ def render_annotated_snapshot(frame_bgr, lm_dict: dict | None, criterion, phase_
         _draw_target_ring(draw, kn, 32, accent, fill_glow)
         anchor = kn
 
-    prefix = "LỖI: " if is_err else ("ĐẠT: " if is_pass else "CHÚ Ý: ")
+    prefix = "FAULT: " if is_err else ("PASS: " if is_pass else "NOTE: ")
     _draw_callout_box(
         draw, w, h, anchor,
         f"{prefix}{criterion.title}",
-        f"Đo được: {criterion.measured_text}  |  Chuẩn: {criterion.standard_text}",
+        f"Measured: {criterion.measured_text}  |  Target: {criterion.standard_text}",
         box_bg, accent,
     )
 
