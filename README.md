@@ -1,7 +1,7 @@
 # HỆ THỐNG TRỢ LÝ AI PHÂN TÍCH TƯ THẾ GOLF (VAR GOLF STUDIO)
 
 Ứng dụng Desktop chuyên nghiệp hỗ trợ Golfer tập luyện và phát hiện lỗi kỹ thuật Swing bằng AI 2D + 3D chuẩn cơ sinh học **PGA / TPI**.
-Giao diện **Dark Mode OLED Sports Analytics Pro (PySide6 / Qt6)** thiết kế theo chuẩn `ui-ux-pro-max`, 100% icon vector SVG sắc nét, tiếng Việt có dấu, không hiện cửa sổ CMD.
+Giao diện **Sáng hiện đại bo góc mềm (Modern White Bento UI - PySide6 / Qt6)** thiết kế theo chuẩn `ui-ux-pro-max`, 100% icon vector SVG sắc nét, tiếng Việt có dấu, không hiện cửa sổ CMD.
 
 ---
 

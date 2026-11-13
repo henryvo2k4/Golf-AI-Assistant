@@ -213,8 +213,8 @@ def render_annotated_snapshot(frame_bgr, lm_dict: dict | None, criterion, phase_
         font_phase = _load_font(15, bold=True)
         pb = draw.textbbox((0, 0), phase_label, font=font_phase)
         pw, ph = pb[2] - pb[0], pb[3] - pb[1]
-        draw.rounded_rectangle([(14, 14), (14 + pw + 24, 14 + ph + 14)], radius=8, fill=(9, 13, 22, 220), outline=(71, 85, 105, 220), width=2)
-        draw.text((26, 20), phase_label, font=font_phase, fill=(248, 250, 252, 255))
+        draw.rounded_rectangle([(16, 16), (16 + pw + 26, 16 + ph + 16)], radius=14, fill=(255, 255, 255, 235), outline=(226, 232, 240, 240), width=2)
+        draw.text((29, 23), phase_label, font=font_phase, fill=(15, 23, 42, 255))
 
     result_rgb = Image.alpha_composite(pil_base, overlay).convert("RGB")
     return cv2.cvtColor(np.array(result_rgb), cv2.COLOR_RGB2BGR)
